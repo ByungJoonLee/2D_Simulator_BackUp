@@ -1,0 +1,189 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5624AA8E-06AB-48DF-B7AB-9419612BA4EF}</ProjectGuid>
+    <RootNamespace>BasicEngineFor2D</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v110</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v110</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v110</PlatformToolset>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>D:\boost_1_53_0\boost_1_53_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <BrowseInformation>true</BrowseInformation>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <Profile>true</Profile>
+      <AdditionalLibraryDirectories>D:\boost_1_53_0\boost_1_53_0\stage64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <Bscmake>
+      <PreserveSbr>true</PreserveSbr>
+    </Bscmake>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="ADVECTION_2D.h" />
+    <ClInclude Include="ADVECTION_METHOD_2D.h" />
+    <ClInclude Include="ARRAY.h" />
+    <ClInclude Include="ARRAY_2D.h" />
+    <ClInclude Include="CG_METHOD.h" />
+    <ClInclude Include="COMMON_DEFINITION.h" />
+    <ClInclude Include="DYNAMIC_ARRAY.h" />
+    <ClInclude Include="EULERIAN_FLUID_SOLVER_2D.h" />
+    <ClInclude Include="FIELD_STRUCTURE_2D.h" />
+    <ClInclude Include="GRID_STRUCTURE_2D.h" />
+    <ClInclude Include="CSR_MATRIX.h" />
+    <ClInclude Include="LEVELSET_2D.h" />
+    <ClInclude Include="LINEAR_SOLVER.h" />
+    <ClInclude Include="MACROS.h" />
+    <ClInclude Include="MATRIX_2X2.h" />
+    <ClInclude Include="MULTITHREADING.h" />
+    <ClInclude Include="PCG_METHOD.h" />
+    <ClInclude Include="POISSON_SOLVER_2D.h" />
+    <ClInclude Include="PROJECTION_2D.h" />
+    <ClInclude Include="PROJECT_INFO.h" />
+    <ClInclude Include="SCRIPT_READER.h" />
+    <ClInclude Include="SIMULATION_MANAGER.h" />
+    <ClInclude Include="SIMULATION_WORLD.h" />
+    <ClInclude Include="VECTOR_2D.h" />
+    <ClInclude Include="VECTOR_ND.h" />
+    <ClInclude Include="VISCOSITY_2D.h" />
+    <ClInclude Include="WORLD_DISCRETIZATION_2D.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ADVECTION_2D.cpp" />
+    <ClCompile Include="ADVECTION_METHOD_2D.cpp" />
+    <ClCompile Include="ARRAY.cpp" />
+    <ClCompile Include="ARRAY_2D.cpp" />
+    <ClCompile Include="CG_METHOD.cpp" />
+    <ClCompile Include="CSR_MATRIX.cpp" />
+    <ClCompile Include="DYNAMIC_ARRAY.cpp" />
+    <ClCompile Include="EULERIAN_FLUID_SOLVER_2D.cpp" />
+    <ClCompile Include="FIELD_STRUCTURE_2D.cpp" />
+    <ClCompile Include="GRID_STRUCTURE_2D.cpp" />
+    <ClCompile Include="LEVELSET_2D.cpp" />
+    <ClCompile Include="LINEAR_SOLVER.cpp" />
+    <ClCompile Include="MATRIX_2X2.cpp" />
+    <ClCompile Include="MULTITHREADING.cpp" />
+    <ClCompile Include="PCG_METHOD.cpp" />
+    <ClCompile Include="POISSON_SOLVER_2D.cpp" />
+    <ClCompile Include="PROJECTION_2D.cpp" />
+    <ClCompile Include="PROJECT_INFO.cpp" />
+    <ClCompile Include="Result.cpp" />
+    <ClCompile Include="SCRIPT_READER.cpp" />
+    <ClCompile Include="SIMULATION_MANAGER.cpp" />
+    <ClCompile Include="SIMULATION_WORLD.cpp" />
+    <ClCompile Include="VECTOR_2D.cpp" />
+    <ClCompile Include="VECTOR_ND.cpp" />
+    <ClCompile Include="VISCOSITY_2D.cpp" />
+    <ClCompile Include="WORLD_DISCRETIZATION_2D.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
