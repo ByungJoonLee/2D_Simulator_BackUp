@@ -41,11 +41,11 @@ public: // Multithreading
 
 public: // Constructors and Destructor
 	FIELD_STRUCTURE_2D(void)
-		: values(0), multithreading(0)
+		: values(0), multithreading(0), is_scalar(true), is_vector(false), is_x_component(false), is_y_component(false)
 	{}
 
 	FIELD_STRUCTURE_2D(const int& i_res_input, const int& j_res_input, const int& i_start_input, const int& j_start_input, const T& x_min_input, const T& y_min_input, const T& x_max_input, const T& y_max_input, const int& ghost_width_input = 0, const bool& is_scalar_input = true, const bool& is_vector_input = false, MULTITHREADING* multithreading_input = 0)
-		: values(0), multithreading(0)
+		: partial_grids(0), is_scalar(true), is_vector(false), is_x_component(false), is_y_component(false), values(0)
 	{
 		Initialize(i_res_input, j_res_input, i_start_input, j_start_input, x_min_input, y_min_input, x_max_input, y_max_input, ghost_width_input, is_scalar_input, is_vector_input, multithreading_input);
 	}
@@ -99,11 +99,11 @@ public: // Initialization Functions
 		is_scalar = is_scalar_input;
 		is_vector = is_vector_input;
 
-		if (multithreading != 0)
+		if (multithreading_input != 0)
 		{
 			multithreading = multithreading_input;
 			grid.SplitInYDirection(multithreading->num_threads, partial_grids);
-			grid_ghost.SplitInYDirection(multithreading->num_threads, partial_grids);
+			grid_ghost.SplitInYDirection(multithreading->num_threads, partial_grids_ghost);
 		}
 	}
 
@@ -115,6 +115,11 @@ public: // Initialization Functions
 	void Initialize(const GRID_STRUCTURE_2D& grid_input, const int& ghost_width_input = 0, const bool& is_scalar_input = true, const bool& is_vector_input = false, MULTITHREADING* multithreading_input = 0)
 	{
 		Initialize(grid_input.i_res, grid_input.j_res, grid_input.i_start, grid_input.j_start, grid_input.x_min, grid_input.y_min, grid_input.x_max, grid_input.y_max, ghost_width_input, is_scalar_input, is_vector_input, multithreading_input);
+	}
+
+	void Initialize(const GRID_STRUCTURE_2D& grid_input, const int& ghost_width_input, MULTITHREADING* multithreading_input)
+	{
+		Initialize(grid_input.i_res, grid_input.j_res, grid_input.i_start, grid_input.j_start, grid_input.x_min, grid_input.y_min, grid_input.x_max, grid_input.y_max, ghost_width_input, true, false, multithreading_input);
 	}
 
 public: // Operator Overloading

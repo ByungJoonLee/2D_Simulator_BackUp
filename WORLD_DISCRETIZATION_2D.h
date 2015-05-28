@@ -4,6 +4,7 @@
 #include "ARRAY_2D.h"
 #include "SCRIPT_READER.h"
 #include "GRID_STRUCTURE_2D.h"
+#include "MULTITHREADING.h"
 
 class WORLD_DISCRETIZATION_2D
 {
@@ -26,7 +27,6 @@ public: // Speedup constants
 	T						dx, dy;
 	T						dx_over_two;
 	T						dy_over_two;
-
 
 public: // Constructor and Destructor
 	WORLD_DISCRETIZATION_2D(void)

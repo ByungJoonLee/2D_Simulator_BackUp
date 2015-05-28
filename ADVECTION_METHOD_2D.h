@@ -545,8 +545,7 @@ public:
 		multithreading.Sync(thread_id);
 
 		T one_over_dx(rho.one_over_dx), one_over_dy(rho.one_over_dy);
-
-		
+				
 		GRID_ITERATION_2D(rho.partial_grids[thread_id])
 		{
 			// x-components
@@ -1288,7 +1287,7 @@ public:
 		}
 	}
 
-	static void WENO5thReinitialization(FIELD_STRUCTURE_2D<TT>& rho, FIELD_STRUCTURE_2D<TT>& rho_ghost, const T& dt, const T& epsilon, const T& epsilon_for_sign_function, MULTITHREADING& multithreading, const int& thread_id)
+	static void WENO5thReinitialization(FIELD_STRUCTURE_2D<TT>& rho, FIELD_STRUCTURE_2D<TT>& rho_ghost, const T& dt, const T& epsilon, const FIELD_STRUCTURE_2D<T>& sign_function, MULTITHREADING& multithreading, const int& thread_id)
 	{
 		ARRAY_2D<TT>& rho_array(rho.array_for_this);
 
@@ -1398,7 +1397,7 @@ public:
 			T rho_p_y = w_p_y_1*(rho_p_y_1*(T)1/3 - rho_p_y_2*(T)7/6 + rho_p_y_3*(T)11/6) + w_p_y_2*(rho_p_y_2*(-(T)1/6) + rho_p_y_3*(T)5/6 + rho_p_y_4*(T)1/3) + w_p_y_3*(rho_p_y_3*(T)1/3 + rho_p_y_4*(T)5/6 - rho_p_y_5*(T)1/6);
 			
 			// Define the sign function
-			T s = rho(i, j)/sqrt(POW2(rho(i, j)) + POW2(epsilon_for_sign_function));
+			T s = sign_function(i, j);
 
 			// Define Sub functions
 			T smx = s*rho_m_x, spx = s*rho_p_x, smy = s*rho_m_y, spy = s*rho_p_y;

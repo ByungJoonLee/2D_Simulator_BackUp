@@ -20,7 +20,6 @@ int main(int argc, char** argv)
 	
 	int i(0), j(0);
 	
-
 	if (simulation.simulation->air_water_simulation)
 	{
 		bool large_bubble(simulation.simulation->eulerian_solver.world_discretization->large_bubble), small_bubble(simulation.simulation->eulerian_solver.world_discretization->small_bubble);
@@ -166,7 +165,7 @@ int main(int argc, char** argv)
 		start_time = clock();
 
 		T dt = simulation.simulation->dt;
-		T accu_dt(dt);
+		//T accu_dt(dt);
 
 		int index(0);
 
@@ -174,7 +173,7 @@ int main(int argc, char** argv)
 		{
 			if (air_bubble_rising)
 			{
-				while(accu_dt < 0.5)
+				while(simulation.simulation->accu_dt < 2.0)
 				{
 					cout << "---------------------" << iter << "---------------------" << endl;
 
@@ -182,10 +181,12 @@ int main(int argc, char** argv)
 					middle_time = clock();
 
 					// Simulating one time step
-					simulation.simulation->eulerian_solver.AdvanceOneTimeStep(dt);
-					dt = simulation.simulation->eulerian_solver.CFLtimecondition();
+					simulation.simulation->AdvanceOneFrame();
+					//simulation.simulation->eulerian_solver.AdvanceOneTimeStep(dt);
+					//dt = simulation.simulation->eulerian_solver.CFLOneTimeStep();
 
-					accu_dt += dt;
+					//simulation.simulation->accu_dt+= dt;
+					
 					iter = iter + 1;
 
 					end_time = clock();
@@ -193,7 +194,7 @@ int main(int argc, char** argv)
 					double elapsed_sec = (double)(end_time - middle_time) / CLOCKS_PER_SEC;
 					double total_sec = (double)(end_time - start_time) / CLOCKS_PER_SEC;
 
-					cout << "Time in terms of given simulation: " << accu_dt << endl;
+					cout << "Time in terms of given simulation: " << simulation.simulation->accu_dt<< endl;
 					cout << "////////////////// Simulating Time //////////////////" << endl;
 					cout << "Simulation time per each iteration: " << elapsed_sec << endl;
 					cout << "Accumulated time: " << total_sec << endl;
@@ -220,7 +221,7 @@ int main(int argc, char** argv)
 			}
 			if (water_drop)
 			{
-				while(accu_dt < 0.5)
+				while(simulation.simulation->accu_dt< 0.5)
 				{
 					cout << "---------------------" << iter << "---------------------" << endl;
 
@@ -229,9 +230,9 @@ int main(int argc, char** argv)
 
 					// Simulating one time step
 					simulation.simulation->eulerian_solver.AdvanceOneTimeStep(dt);
-					dt = simulation.simulation->eulerian_solver.CFLtimecondition();
+					dt = simulation.simulation->eulerian_solver.CFLOneTimeStep();
 
-					accu_dt += dt;
+					simulation.simulation->accu_dt+= dt;
 					iter = iter + 1;
 
 					end_time = clock();
@@ -239,7 +240,7 @@ int main(int argc, char** argv)
 					double elapsed_sec = (double)(end_time - middle_time) / CLOCKS_PER_SEC;
 					double total_sec = (double)(end_time - start_time) / CLOCKS_PER_SEC;
 
-					cout << "Time in terms of given simulation: " << accu_dt << endl;
+					cout << "Time in terms of given simulation: " << simulation.simulation->accu_dt<< endl;
 					cout << "////////////////// Simulating Time //////////////////" << endl;
 					cout << "Simulation time per each iteration: " << elapsed_sec << endl;
 					cout << "Accumulated time: " << total_sec << endl;
@@ -268,7 +269,7 @@ int main(int argc, char** argv)
 		{
 			if (air_bubble_rising)
 			{
-				while(accu_dt < 0.05)
+				while(simulation.simulation->accu_dt < 2.0)
 				{
 					cout << "---------------------" << iter << "---------------------" << endl;
 
@@ -276,10 +277,11 @@ int main(int argc, char** argv)
 					middle_time = clock();
 
 					// Simulating one time step
-					simulation.simulation->eulerian_solver.AdvanceOneTimeStep(dt);
-					dt = simulation.simulation->eulerian_solver.CFLtimecondition();
+					simulation.simulation->AdvanceOneFrame();
+					//simulation.simulation->eulerian_solver.AdvanceOneTimeStep(dt);
+					//dt = simulation.simulation->eulerian_solver.CFLOneTimeStep();
 
-					accu_dt += dt;
+					//simulation.simulation->accu_dt+= dt;
 					iter = iter + 1;
 
 					end_time = clock();
@@ -287,7 +289,7 @@ int main(int argc, char** argv)
 					double elapsed_sec = (double)(end_time - middle_time) / CLOCKS_PER_SEC;
 					double total_sec = (double)(end_time - start_time) / CLOCKS_PER_SEC;
 
-					cout << "Time in terms of given simulation: " << accu_dt << endl;
+					cout << "Time in terms of given simulation: " << simulation.simulation->accu_dt<< endl;
 					cout << "////////////////// Simulating Time //////////////////" << endl;
 					cout << "Simulation time per each iteration: " << elapsed_sec << endl;
 					cout << "Accumulated time: " << total_sec << endl;
@@ -345,7 +347,7 @@ int main(int argc, char** argv)
 			}
 			if (water_drop)
 			{
-				while(accu_dt < 0.05)
+				while(simulation.simulation->accu_dt< 0.05)
 				{
 					cout << "---------------------" << iter << "---------------------" << endl;
 
@@ -354,9 +356,9 @@ int main(int argc, char** argv)
 
 					// Simulating one time step
 					simulation.simulation->eulerian_solver.AdvanceOneTimeStep(dt);
-					dt = simulation.simulation->eulerian_solver.CFLtimecondition();
+					dt = simulation.simulation->eulerian_solver.CFLOneTimeStep();
 
-					accu_dt += dt;
+					simulation.simulation->accu_dt+= dt;
 					iter = iter + 1;
 
 					end_time = clock();
@@ -364,7 +366,7 @@ int main(int argc, char** argv)
 					double elapsed_sec = (double)(end_time - middle_time) / CLOCKS_PER_SEC;
 					double total_sec = (double)(end_time - start_time) / CLOCKS_PER_SEC;
 
-					cout << "Time in terms of given simulation: " << accu_dt << endl;
+					cout << "Time in terms of given simulation: " << simulation.simulation->accu_dt<< endl;
 					cout << "////////////////// Simulating Time //////////////////" << endl;
 					cout << "Simulation time per each iteration: " << elapsed_sec << endl;
 					cout << "Accumulated time: " << total_sec << endl;
@@ -509,7 +511,7 @@ int main(int argc, char** argv)
 
 		int index(0);
 		
-		while(accu_dt < 0.5)
+		while(simulation.simulation->accu_dt< 0.5)
 		{
 			cout << "---------------------" << iter << "---------------------" << endl;
 
@@ -518,9 +520,9 @@ int main(int argc, char** argv)
 
 			// Simulating one time step
 			simulation.simulation->eulerian_solver.AdvanceOneTimeStep(dt);
-			dt = simulation.simulation->eulerian_solver.CFLtimecondition();
+			dt = simulation.simulation->eulerian_solver.CFLOneTimeStep();
 
-			accu_dt += dt;
+			simulation.simulation->accu_dt+= dt;
 			iter = iter + 1;
 
 			end_time = clock();
@@ -528,7 +530,7 @@ int main(int argc, char** argv)
 			double elapsed_sec = (double)(end_time - middle_time) / CLOCKS_PER_SEC;
 			double total_sec = (double)(end_time - start_time) / CLOCKS_PER_SEC;
 
-			cout << "Time in terms of given simulation: " << accu_dt << endl;
+			cout << "Time in terms of given simulation: " << simulation.simulation->accu_dt<< endl;
 			cout << "////////////////// Simulating Time //////////////////" << endl;
 			cout << "Simulation time per each iteration: " << elapsed_sec << endl;
 			cout << "Accumulated time: " << total_sec << endl;

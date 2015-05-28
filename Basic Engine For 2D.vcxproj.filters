@@ -34,9 +34,6 @@
     <Filter Include="Dynamics\Fluid_Dynamics\Poisson_Solver\Linear_Solver">
       <UniqueIdentifier>{1fca6503-ac99-4476-ae01-844aba92a974}</UniqueIdentifier>
     </Filter>
-    <Filter Include="MULTITHREADING">
-      <UniqueIdentifier>{67b7317e-5366-4f51-a4f8-efdb7dceee05}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VECTOR_2D.h">
@@ -111,14 +108,14 @@
     <ClInclude Include="PCG_METHOD.h">
       <Filter>Dynamics\Fluid_Dynamics\Poisson_Solver\Linear_Solver</Filter>
     </ClInclude>
-    <ClInclude Include="MULTITHREADING.h">
-      <Filter>MULTITHREADING</Filter>
-    </ClInclude>
     <ClInclude Include="VISCOSITY_2D.h">
       <Filter>Dynamics\Fluid_Dynamics</Filter>
     </ClInclude>
     <ClInclude Include="MATRIX_2X2.h">
       <Filter>Data_Struacture\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="MULTITHREADING.h">
+      <Filter>Data_Struacture</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -188,9 +185,6 @@
     <ClCompile Include="PCG_METHOD.cpp">
       <Filter>Dynamics\Fluid_Dynamics\Poisson_Solver\Linear_Solver</Filter>
     </ClCompile>
-    <ClCompile Include="MULTITHREADING.cpp">
-      <Filter>MULTITHREADING</Filter>
-    </ClCompile>
     <ClCompile Include="MATRIX_2X2.cpp">
       <Filter>Data_Struacture\Math</Filter>
     </ClCompile>
@@ -199,6 +193,9 @@
     </ClCompile>
     <ClCompile Include="VISCOSITY_2D.cpp">
       <Filter>Dynamics\Fluid_Dynamics</Filter>
+    </ClCompile>
+    <ClCompile Include="MULTITHREADING.cpp">
+      <Filter>Data_Struacture</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

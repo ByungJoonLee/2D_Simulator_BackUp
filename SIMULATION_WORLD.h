@@ -20,7 +20,8 @@ public: // Essential for script update
 	std::string						script_base_name;
 
 public: // Simulation Properties
-	T								dt;
+	T								dt, accu_dt;
+	T								CFL;
 	
 public: // Options for Simulation
 	bool							air_water_simulation;
@@ -57,7 +58,9 @@ public: // Initialization Functions
 		SCRIPT_BLOCK script_block_for_this = script_reader.FindBlock("SIMULATION_WORLD");
 
 		dt = script_block_for_this.GetFloat("dt", (T)0.01);
-		
+		CFL = script_block_for_this.GetFloat("CFL", (T)0);
+		accu_dt = (T)0;
+
 		// Simulation Options
 		air_water_simulation = script_block_for_this.GetBoolean("air_water_simulation", false);
 		oil_water_simulation = script_block_for_this.GetBoolean("oil_water_simulation", false);
@@ -124,24 +127,68 @@ public: // Initialization Functions
 		{
 			eulerian_solver.air_water_simulation = air_water_simulation;
 			eulerian_solver.oil_water_simulation = oil_water_simulation;
-			eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM_AIR_WATER"));
+			eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM_AIR_WATER"), multithreading);
 		}
 		if (oil_water_simulation)
 		{
 			eulerian_solver.air_water_simulation = air_water_simulation;
 			eulerian_solver.oil_water_simulation = oil_water_simulation;
-			eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM_OIL_WATER"));
+			eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM_OIL_WATER"), multithreading);
 		}
 		if (vortex_sheet_problem)
 		{
 			eulerian_solver.vortex_sheet_problem = vortex_sheet_problem;
-			eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM_AIR_WATER"));
+			eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM_AIR_WATER"), multithreading);
 		}
 	}
 
 	void AdvanceOneTimeStep(const T& dt_input)
 	{
 		eulerian_solver.AdvanceOneTimeStep(dt_input);
+	}
+	
+	void AdvanceOneTimeStepThread(const int& thread_id, const T& dt_input)
+	{
+		eulerian_solver.AdvanceOneTimeStepThread(dt_input, thread_id);
+	}
+
+	void AdvanceOneFrameThread(const int& thread_id)
+	{
+		BEGIN_HEAD_THREAD_WORK
+		{
+			dt = DetermineTimeStep()*CFL;
+			accu_dt += dt;
+			cout << "Max x-velocity   : " << eulerian_solver.water_projection->max_velocity_x << endl;
+			cout << "Max y-velocity   : " << eulerian_solver.water_projection->max_velocity_y << endl;
+			cout << "Time Step        : " << dt << endl;
+			cout << "Accumulated Time : " << accu_dt << endl;
+			cout << "-------CFL Time Step-------" << endl;
+			cout << "c_f              : " << eulerian_solver.c_f << endl;
+			cout << "g_f              : " << eulerian_solver.g_f << endl;
+			cout << "s_f              : " << eulerian_solver.s_f << endl;
+			cout << "v_f              : " << eulerian_solver.v_f << endl;
+		}
+		END_HEAD_THREAD_WORK;
+
+		AdvanceOneTimeStepThread(thread_id, dt);
+		
+		multithreading->Sync(thread_id);
+	}
+
+	void AdvanceOneFrame()
+	{
+		eulerian_solver.water_levelset->ComputeCurvaturesThreaded();
+		multithreading->RunThreads(&SIMULATION_WORLD::AdvanceOneFrameThread, this);
+	}
+
+	T DetermineTimeStep()
+	{
+		//T dt_for_this = (T)1/frame_rate;
+		T dt_for_this(0);
+
+		dt_for_this = eulerian_solver.CFLOneTimeStep();
+		
+		return dt_for_this;
 	}
 };
 		

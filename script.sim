@@ -1,0 +1,198 @@
+SIMULATION_WORLD
+{
+	// simulation properties
+	dt = 0.000001
+	
+	// simulation options
+	use_eulerian_solver	= true
+	
+	// options for example
+	air_water_simulation    = true
+	oil_water_simulation    = false
+
+	WORLD_DISCRETIZATION_AIR_WATER
+	{
+		large_bubble = false
+		small_bubble = true
+	
+		GRID_STRUCTURE_2D_LARGE
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0)
+			base_grid_resolution = (40, 60)
+			base_grid_min = ( -1, -1)
+			base_grid_max = ( 1, 2)
+		}
+		GRID_STRUCTURE_2D_SMALL
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0)
+			base_grid_resolution = (320, 480)
+			base_grid_min = ( -0.01, -0.01)
+			base_grid_max = ( 0.01, 0.02)
+		}
+
+	}
+	
+	WORLD_DISCRETIZATION_OIL_WATER
+	{
+		GRID_STRUCTURE_2D_LARGE
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0)
+			base_grid_resolution = (40, 60)
+			base_grid_min = ( -1, -1)
+			base_grid_max = ( 1, 2)
+		}
+		GRID_STRUCTURE_2D_SMALL
+		{
+			resolution_scale = 1
+
+			start_indices = (0,0)
+			base_grid_resolution = (40, 60)
+			base_grid_min = ( -0.01, -0.01)
+			base_grid_max = ( 0.01, 0.02)
+		}
+
+	}
+}
+
+FLUID_SOLVER_UNIFORM_AIR_WATER
+{
+	is_velocity_advection_active = true
+	is_sourcing_active = true
+	is_projection_active = true
+	is_levelset_advection_active = true
+
+	fastsweeping_reinitialization = false
+	sussmanstyle_reinitialization = true
+	
+	use_rk_3rd = true
+	use_mac_grid = true
+	
+	CSF_model = false
+
+	use_delta_function_formulation = true
+	use_jump_condition_on_viscosity = false
+	
+	curvature_by_normal_vector = false
+	curvature_by_levelset = true
+
+	LEVELSET_ADVECTION
+	{
+		use_5th_weno = true
+		use_3rd_eno = false
+		epsilon = 0.000001
+	}
+		
+	VELOCITY_ADVECTION
+	{
+		use_5th_weno_v = false
+		use_3rd_eno_v = true
+		epsilon = 0.000001
+	}	
+	
+	PROJECTION
+	{			
+		tolerance = 0.000001
+		max_iteration = 10000
+
+		air_bubble_rising = true
+		water_drop = false
+		
+		poisson_solver_type = "PCG"
+		//MULTIGRID, CG, PCG, HYBRID, GS, CUDAPCG, CUDACG
+
+   		use_multilevel_method = false
+		use_2nd_order = false
+		use_variable_density = true
+
+		artificial_viscosity = 1
+
+		remove_neumann_pocket = false
+	}
+	
+	cfl_number = 0.5
+	
+	ghost_width = 3
+	
+	gravity = (0, -9.8)
+
+	water_viscosity = 0.001137
+	water_density = 1000
+	surface_tension = 0.0728
+	air_density = 1.226
+	air_viscosity = 0.0000178	
+}
+
+FLUID_SOLVER_UNIFORM_OIL_WATER
+{
+	is_velocity_advection_active = true
+	is_sourcing_active = true
+	is_projection_active = true
+	is_levelset_advection_active = true
+
+	fastsweeping_reinitialization = false
+	sussmanstyle_reinitialization = true
+	
+	use_rk_3rd = true
+	use_mac_grid = true
+	
+	CSF_model = false
+
+	use_delta_function_formulation = true
+	use_jump_condition_on_viscosity = false
+	
+	curvature_by_normal_vector = false
+	curvature_by_levelset = true
+
+	LEVELSET_ADVECTION
+	{
+		use_5th_weno = true
+		use_3rd_eno = false
+		epsilon = 0.000001
+	}
+		
+	VELOCITY_ADVECTION
+	{
+		use_5th_weno_v = false
+		use_3rd_eno_v = true
+		epsilon = 0.000001
+	}	
+	
+	PROJECTION
+	{			
+		tolerance = 0.000001
+		max_iteration = 10000
+
+		air_bubble_rising = true
+		water_drop = false
+		
+		poisson_solver_type = "PCG"
+		//MULTIGRID, CG, PCG, HYBRID, GS, CUDAPCG, CUDACG
+
+   		use_multilevel_method = false
+		use_2nd_order = false
+		use_variable_density = true
+
+		artificial_viscosity = 1
+
+		remove_neumann_pocket = false
+	}
+	
+	cfl_number = 0.5
+	
+	ghost_width = 3
+	
+	gravity = (0, -9.8)
+
+	oil_viscosity   = 6.01
+	oil_density     = 0.905
+	water_viscosity = 0.01
+	water_density	= 0.995
+
+	weber_number    = 
+}

@@ -28,10 +28,17 @@ enum  POISSON_SOLVER_TYPE                                   {NO_SOLVER, CG, PCG}
 #define GRID_ITERATION_2D(grid_2d_input)					for(int j_start = (grid_2d_input).j_start, j_end = (grid_2d_input).j_end, i_start = (grid_2d_input).i_start, i_end = (grid_2d_input).i_end, i, j = j_start; j <= j_end; ++j) for(i = i_start; i <= i_end; ++i)
 
 #define BEGIN_GRID_ITERATION_2D(grid_2d_input)				{GRID_STRUCTURE_2D& grid_2d_itr(grid_2d_input);																								\
-															 int i, j;																																	\
+															 int i(0), j(0);																																	\
 															 const int j_start = grid_2d_itr.j_start, j_end = grid_2d_itr.j_end, i_start = grid_2d_itr.i_start, i_end = grid_2d_itr.i_end;				\
 															 for (int j = j_start; j <= j_end; ++j) for (int i = i_start; i <= i_end; ++i) 
 #define END_GRID_ITERATION_2D								 multithreading->Sync(thread_id);}
 
+#define BEGIN_HEAD_THREAD_WORK								 if(thread_id == 0)
+#define END_HEAD_THREAD_WORK								 multithreading->Sync(thread_id);
 
+#define HEAD_THREAD_WORK(expression)						 if(thread_id == 0){expression;}; multithreading->Sync(thread_id);
+
+#define END_GRID_ITERATION_SUM(sync_value)					 multithreading->SyncSum(thread_id, sync_value);}
+
+#define END_GRID_ITERATION_MAX_2D(sync_value)				 multithreading->SyncMax(thread_id, sync_value);}
 															

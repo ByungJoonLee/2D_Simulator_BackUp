@@ -22,7 +22,10 @@ public: // Essential Data
 	FIELD_STRUCTURE_2D<VT>			normal;
 	FIELD_STRUCTURE_2D<VT>			tangential;
 	FIELD_STRUCTURE_2D<T>			curvature;
-
+	
+	// For curvature calculation
+	FIELD_STRUCTURE_2D<T>           phi_x, phi_y, phi_xx, phi_yy, phi_xy;
+	
 	// For Gradient Agmented Method
 	FIELD_STRUCTURE_2D<VT>			gradient;
 
@@ -61,10 +64,16 @@ public: // Initialization Functions
 
 		fixed.Initialize(grid.i_start - ghost_width, grid.j_start - ghost_width, grid.i_res + 2*ghost_width, grid.j_res + 2*ghost_width, false);
 
-		normal.Initialize(grid_input, 2, false, true, multithreading_input);
+		normal.Initialize(grid_input, 1, false, true, multithreading_input);
 		tangential.Initialize(grid_input, 1, false, true, multithreading_input);
-		curvature.Initialize(grid_input, 2, true, false, multithreading_input);
+		curvature.Initialize(grid_input, 0, true, false, multithreading_input);
 
+		phi_x.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_y.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_xx.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_yy.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_xy.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		
 		phi.AssignAllValues(grid.dx);
 		phi_true.Initialize(phi.i_start, phi.j_start, phi.i_res, phi.j_res, true);
 
@@ -91,6 +100,12 @@ public: // Initialization Functions
 		normal.Initialize(i_res_input + 2, j_res_input + 2, i_start_input - 1, j_start_input - 1, x_min_input - grid.dx, y_min_input - grid.dy, x_max_input + grid.dx, y_max_input + grid.dy, 0, false, true, multithreading_input);
 		tangential.Initialize(i_res_input + 2, j_res_input + 2, i_start_input - 1, j_start_input - 1, x_min_input - grid.dx, y_min_input - grid.dy, x_max_input + grid.dx, y_max_input + grid.dy, 0, false, true, multithreading_input);
 		curvature.Initialize(i_res_input, j_res_input, i_start_input, j_start_input, x_min_input, y_min_input, x_max_input, y_max_input, 0, true, false, multithreading_input);
+
+		phi_x.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_y.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_xx.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_yy.Initialize(signed_distance_field.grid, 2, multithreading_input);
+		phi_xy.Initialize(signed_distance_field.grid, 2, multithreading_input);
 
 		phi.AssignAllValues(grid.dx);
 		phi_true.Initialize(phi.i_start, phi.j_start, phi.i_res, phi.j_res, true);
@@ -596,19 +611,30 @@ public: // Member Functions
 		}*/
 	}
 
-	void ComputeGradient()
+	void ComputeNormals(const int& thread_id)
 	{
-		for (int j = grid.j_start; j <= grid.j_end; j++)
+		signed_distance_field.FillGhostCellsFrom(phi, false, thread_id);
+
+		BEGIN_GRID_ITERATION_2D(normal.partial_grids[thread_id])
 		{
-			for (int i = grid.i_start; i <= grid.i_end; i++)
+			VT& nor(normal(i, j));
+
+			T nor_x = (phi(i+1, j) - phi(i-1, j))*signed_distance_field.one_over_2dx, nor_y = (phi(i, j+1) - phi(i, j-1))*signed_distance_field.one_over_2dy;
+			T mag_of_normal = sqrt(POW2(nor_x) + POW2(nor_y));
+
+			if (mag_of_normal != 0)
 			{
-				gradient(i, j).x = (phi(i+1, j) - phi(i-1, j))*signed_distance_field.one_over_2dx;
-				gradient(i, j).y = (phi(i, j+1) - phi(i, j-1))*signed_distance_field.one_over_2dy;
-			}	
-		}
-
-		//gradient.FillGhostCellsContinuousDerivativesFrom(gradient.array_for_this, true);
-
+				nor.x = nor_x;
+				nor.y = nor_y;
+			}
+			else
+			{
+				nor.x = (phi(i+1, j) - phi(i, j))*signed_distance_field.one_over_dx;
+				nor.y = (phi(i, j+1) - phi(i, j))*signed_distance_field.one_over_dy;
+			}
+			nor.MakeThisUnit();			
+		}	
+		END_GRID_ITERATION_2D;
 		/*GRID_ITERATION_2D(grid)
 		{
 			VT& nor(normal(i, j));
@@ -631,6 +657,29 @@ public: // Member Functions
 		}*/
 	}
 
+	void ComputeGradient()
+	{
+		for (int j = grid.j_start; j <= grid.j_end; j++)
+		{
+			for (int i = grid.i_start; i <= grid.i_end; i++)
+			{
+				gradient(i, j).x = (phi(i+1, j) - phi(i-1, j))*signed_distance_field.one_over_2dx;
+				gradient(i, j).y = (phi(i, j+1) - phi(i, j-1))*signed_distance_field.one_over_2dy;
+			}	
+		}
+	}
+
+	void ComputeGradient(const int& thread_id)
+	{
+		
+		BEGIN_GRID_ITERATION_2D(partial_grids[thread_id])
+		{
+			gradient(i, j).x = (phi(i+1, j) - phi(i-1, j))*signed_distance_field.one_over_2dx;
+			gradient(i, j).y = (phi(i, j+1) - phi(i, j-1))*signed_distance_field.one_over_2dy;
+		}
+		END_GRID_ITERATION_2D;
+	}
+
 	// For 2D case
 	void ComputeTangential(void)
 	{
@@ -647,6 +696,7 @@ public: // Member Functions
 	}
 
 	// Need to consider 1. Boundary Condition when curvature is defined as the 1st one. 
+	
 	void ComputeCurvatures(void)
 	{
 		if (is_axisymmetric)
@@ -701,13 +751,6 @@ public: // Member Functions
 			// Curvature calculated by levelset
 			if (curvature_by_levelset == true)
 			{
-				FIELD_STRUCTURE_2D<T> phi_x, phi_y, phi_xx, phi_yy, phi_xy;
-				phi_x.Initialize(signed_distance_field.grid, 2);
-				phi_y.Initialize(signed_distance_field.grid, 2);
-				phi_xx.Initialize(signed_distance_field.grid, 2);
-				phi_yy.Initialize(signed_distance_field.grid, 2);
-				phi_xy.Initialize(signed_distance_field.grid, 2);
-	
 				GRID_ITERATION_2D(signed_distance_field.grid)
 				{
 					phi_x(i, j) = (phi(i + 1, j) - phi(i - 1, j))*signed_distance_field.one_over_2dx;
@@ -773,6 +816,105 @@ public: // Member Functions
 		}
 	}
 	
+	void ComputeCurvaturesThread(const int& thread_id)
+	{
+		T tolerance = (T)1/min(grid.dx, grid.dy);
+		
+		// Curvature by the definition of divergence of normal
+		if (curvature_by_normal_vector == true)
+		{
+			normal.FillGhostCellsFrom(normal.array_for_this, true, thread_id);
+
+			BEGIN_GRID_ITERATION_2D(curvature.partial_grids[thread_id])
+			{
+				T curv = (normal(i+1, j).x - normal(i-1, j).x)*signed_distance_field.one_over_2dx;
+				curv += (normal(i, j+1).y - normal(i, j+1).y)*signed_distance_field.one_over_2dy;
+				
+				if (abs(curv) <= tolerance)
+				{
+					curvature(i, j) = -curv;
+				}
+				else
+				{
+					curvature(i, j) = -tolerance;
+				}
+			}
+			END_GRID_ITERATION_2D;
+		}
+		
+		signed_distance_field.FillGhostCellsContinuousDerivativesFrom(signed_distance_field.array_for_this, true, thread_id);
+
+		// Curvature calculated by levelset
+		if (curvature_by_levelset == true)
+		{
+			BEGIN_GRID_ITERATION_2D(signed_distance_field.partial_grids[thread_id])
+			{
+				phi_x(i, j) = (phi(i + 1, j) - phi(i - 1, j))*signed_distance_field.one_over_2dx;
+				phi_y(i, j) = (phi(i, j + 1) - phi(i, j - 1))*signed_distance_field.one_over_2dy;
+				phi_xx(i, j) = (phi(i + 1, j) - 2*phi(i, j) + phi(i - 1, j))*signed_distance_field.one_over_dx2;
+				phi_yy(i, j) = (phi(i, j + 1) - 2*phi(i, j) + phi(i, j - 1))*signed_distance_field.one_over_dy2;
+				phi_xy(i, j) = (phi(i + 1, j + 1) - phi(i + 1, j - 1) - phi(i - 1, j + 1) + phi(i - 1, j - 1))*signed_distance_field.one_over_2dx*signed_distance_field.one_over_2dy;		
+			}
+			END_GRID_ITERATION_2D;
+
+			T px, py, pxx, pyy, pxy;
+			
+			BEGIN_GRID_ITERATION_2D(signed_distance_field.partial_grids[thread_id])
+			{
+				px = phi_x(i, j);
+				py = phi_y(i, j);
+				pxx = phi_xx(i, j);
+				pyy = phi_yy(i, j);
+				pxy = phi_xy(i, j);
+						
+				T magnitude = sqrt(POW2(px) + POW2(py));
+				T deno = POW3(magnitude);
+						
+				T curv(0);
+	
+				if (deno != 0)
+				{
+					T one_over_deno = (T)1/deno;
+					curv = -(POW2(px)*pyy - (T)2*px*py*pxy + POW2(py)*pxx)*one_over_deno;
+				}
+				else
+				{
+					px = (phi(i + 1, j) - phi(i, j))*grid.one_over_dx, py = (phi(i, j + 1) - phi(i, j))*grid.one_over_dy;
+					magnitude = sqrt(POW2(px) + POW2(py));
+					deno = POW3(magnitude);
+					if (deno == 0)
+					{
+						cout << "Denominator cannot be zero!!" << endl;
+						exit(0);
+					}
+					T one_over_deno = (T)1/deno;
+					curv = -(POW2(px)*pyy - (T)2*px*py*pxy + POW2(py)*pxx)*one_over_deno;
+				}
+		
+				if (abs(curv) <= tolerance)
+				{
+					curvature(i, j) = curv;
+				}
+				else if (curv > tolerance)
+				{
+					curvature(i, j) = tolerance;
+				}
+				else if (curv < -tolerance)
+				{
+					curvature(i, j) = -tolerance;
+				}
+	
+				//curvature(i, j) = curv;
+			}
+			END_GRID_ITERATION_2D;
+		}
+	}
+
+	void ComputeCurvaturesThreaded()
+	{
+		multithreading->RunThreads(&LEVELSET_2D::ComputeCurvaturesThread, this);
+	}
+
 	inline const VT Normal(const VT& position) const
 	{
 		return normal.BilinearInterpolation(position);

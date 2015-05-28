@@ -16,19 +16,25 @@ public: // Essential Data
 	int						value_ix;
 	int						prev_row;
 
+	MULTITHREADING*			multithreading;
+
+	int						*start_ix, *end_ix;
+	int*					prev_row_array;
+	int*					values_ix_array;
+
 public:	// Constructors and Destructor
 	CSR_MATRIX(void)
-		: values(0), column_index(0), row_ptr(0)
+		: values(0), column_index(0), row_ptr(0), multithreading(0), start_ix(0), end_ix(0), prev_row_array(0), values_ix_array(0)
 	{}
 
 	CSR_MATRIX(const int& N_input, const int& nz_input)
-		: values(0), column_index(0), row_ptr(0)
+		: values(0), column_index(0), row_ptr(0), multithreading(0), start_ix(0), end_ix(0), prev_row_array(0), values_ix_array(0)
 	{
 		Initialize(N_input, nz_input);
 	}
 
 	CSR_MATRIX(const CSR_MATRIX<T>& matrix_input)
-		: values(0), column_index(0), row_ptr(0)
+		: values(0), column_index(0), row_ptr(0), multithreading(0), start_ix(0), end_ix(0), prev_row_array(0), values_ix_array(0)
 	{
 		Initialize(matrix_input);
 	}
@@ -40,23 +46,40 @@ public:	// Constructors and Destructor
 
 	void DeleteMemory(void)
 	{
-		if (values != 0)
-		{
-			delete [] values;
-		}
-
-		if (row_ptr != 0)
-		{
-			delete [] row_ptr;
-		}
-
-		if (column_index != 0)
-		{
-			delete [] column_index;
-		}
+		DELETE_ARRAY(values);
+		DELETE_ARRAY(row_ptr);
+		DELETE_ARRAY(column_index);
+		DELETE_ARRAY(start_ix);
+		DELETE_ARRAY(end_ix);
+		DELETE_ARRAY(prev_row_array);
+		DELETE_ARRAY(values_ix_array);
 	}
 
 public: // Initialization Functions
+	void Initialize(const int& N_input, const int& nz_input, MULTITHREADING* multithreading_input)
+	{
+		DeleteMemory();
+
+		multithreading = multithreading_input;
+		
+		start_ix = new int [multithreading->num_threads];
+		end_ix = new int [multithreading->num_threads];
+		prev_row_array = new int [multithreading->num_threads];
+		values_ix_array = new int [multithreading->num_threads];
+
+		N = N_input;
+		nz = nz_input;
+
+		values = new TT [nz];
+		row_ptr = new int [N+1];
+		column_index = new int [nz];
+
+		value_ix = 0;
+		prev_row = -1;
+
+		row_ptr[N_input] = nz_input;
+	}
+	
 	void Initialize(const int& N_input, const int& nz_input)
 	{
 		DeleteMemory();
@@ -73,7 +96,38 @@ public: // Initialization Functions
 
 		row_ptr[N_input] = nz_input;
 	}
+
+	void Initialize(const CSR_MATRIX<TT>& matrix_input, MULTITHREADING* multithreading_input)
+	{
+		Initialize(matrix_input.N, matrix_input.nz, multithreading_input);
 	
+		for (int i = 0; i < nz; i++)
+		{
+			values[i] = matrix_input.values[i];
+		}
+
+		for (int i = 0; i < N + 1; i++)
+		{
+			row_ptr[i] = matrix_input.row_ptr[i];
+		}
+
+		for (int i = 0; i < nz; i++)
+		{
+			column_index[i] = matrix_input.column_index[i];
+		}
+		
+		for (int i = 0; i < multithreading->num_threads; i++)
+		{
+			start_ix[i] = matrix_input.start_ix[i];
+			end_ix[i] = matrix_input.end_ix[i];
+			prev_row_array[i] = matrix_input.prev_row_array[i];
+			values_ix_array[i] = matrix_input.values_ix_array[i];
+		}
+
+		value_ix = matrix_input.value_ix;
+		prev_row = matrix_input.prev_row;
+	}
+
 	void Initialize(const CSR_MATRIX<TT>& matrix_input)
 	{
 		Initialize(matrix_input.N, matrix_input.nz);
@@ -109,6 +163,23 @@ public: // Operator Overloading
 	inline TT& operator()(const int& row_input, const int& column_input) const
 	{
 		bool is_nonzero(false);
+		
+		int vix;
+		vix = row_ptr[row_input];
+
+		/*while (true)
+		{
+			if (column_index[vix] == column_input)
+			{
+				return values[vix];
+				is_nonzero = true;
+			}
+			else
+			{
+				vix += 1;
+			}
+		}*/
+
 		for (int vix = row_ptr[row_input]; vix < row_ptr[row_input + 1]; vix++)
 		{
 			if (column_index[vix] == column_input)
@@ -120,8 +191,8 @@ public: // Operator Overloading
 
 		if (is_nonzero == false)
 		{
-			TT zero(0);
-			TT& temp = zero;
+			T zero(0);
+			T& temp = zero;
 			return temp;
 		}
 	}
@@ -149,6 +220,25 @@ public: // Member Functions
 		value_ix++;
 	}
 
+	void AssignValue(const int& row_input, const int& column_input, const TT& values_input, const int& thread_id)
+	{
+		values[values_ix_array[thread_id]] = values_input;
+
+		if(row_input != prev_row_array[thread_id])
+		{
+			//check whether the matrix is well-made or not.
+			//it can be omitted in simulation stage.
+			//assert(row_input == prev_row_array[thread_id]+1);
+
+			row_ptr[row_input] = values_ix_array[thread_id];
+			prev_row_array[thread_id] = row_input;
+		}
+
+		column_index[values_ix_array[thread_id]] = column_input;
+
+		values_ix_array[thread_id] ++;
+	}
+
 	inline void Multiply(const VECTOR_ND<TT>& x, VECTOR_ND<TT>& b) const
 	{
 		assert(N == x.num_dimension);
@@ -166,6 +256,32 @@ public: // Member Functions
 
 			bval[row] = v;
          }
+	}
+
+	inline void Multiply(const VECTOR_ND<TT>& x, VECTOR_ND<TT>& b, const int& thread_id) const
+	{
+		assert(N == x.num_dimension);
+		assert(x.num_dimension == b.num_dimension);
+
+		T *bval(b.values), *xval(x.values);
+
+		const int k_start(multithreading->start_ix_1D[thread_id]), k_end(multithreading->end_ix_1D[thread_id]);
+		for(int row = k_start; row <= k_end; row++) // multiply 'row'th row of this matrix and vector x to compute b[row]
+		{
+			T v=0;
+			const int vix_start = row_ptr[row];	assert(vix_start >= 0);
+			const int vix_end = row_ptr[row+1];	assert(vix_start < nz);
+			for(int vix = vix_start; vix < vix_end; vix ++) // iterate all components of 'row'th row of this matrix
+			{
+				assert(column_index[vix] < N);
+
+				v += values[vix]*xval[column_index[vix]];
+			}
+
+			bval[row] = v;
+		}
+
+		multithreading->Sync(thread_id);
 	}
 
 	inline void ComputeResidual(const VECTOR_ND<TT>& x, const VECTOR_ND<TT>& b, VECTOR_ND<TT>& residual) const
@@ -188,6 +304,33 @@ public: // Member Functions
 			// residual = b - A*x
 			rval[row] = bval[row] - v;
 		}
+	}
+
+	inline void ComputeResidual(const VECTOR_ND<TT>& x, const VECTOR_ND<TT>& b, VECTOR_ND<TT>& residual, const int& thread_id) const
+	{
+		assert(N == x.num_dimension);
+		assert(x.num_dimension == b.num_dimension);
+		assert(residual.num_dimension == N);
+
+		// speed-up pointers
+		T *bval(b.values), *xval(x.values), *rval(residual.values);
+
+		const int k_start(multithreading->start_ix_1D[thread_id]), k_end(multithreading->end_ix_1D[thread_id]);
+		for(int row = k_start; row <= k_end; row++) // multiply 'row'th row of this matrix and vector x to compute b[row]
+		{
+			// compute A*x
+			// TODO: we may optimize row_ptr_[row] and row_ptr_[row+1] access
+			T v=0;
+			for(int vix = row_ptr[row]; vix < row_ptr[row+1]; vix ++) // iterate all components of 'row'th row of this matrix
+			{
+				v += values[vix]*xval[column_index[vix]];
+			}
+
+			// residual = b - A*x
+			rval[row] = bval[row] - v;
+		}
+
+		multithreading->Sync(thread_id);
 	}
 
 	TT* GetValue(const int& row, const int& column)
@@ -520,4 +663,53 @@ static CSR_MATRIX<TT> DiagonalPreconditioner(const CSR_MATRIX<TT>& A)
 	}
 
 	return D;
+}
+
+template<class TT>
+static void DiagonalPreconditioner(const CSR_MATRIX<TT>& A, CSR_MATRIX<TT>& D, MULTITHREADING* multithreading, const int& thread_id)
+{
+	const int N = A.N;
+
+	BEGIN_HEAD_THREAD_WORK
+	{
+		D.Initialize(N, N, multithreading);
+		
+		multithreading->SplitDomainIndex1D(0, D.N);
+		
+		D.start_ix[0] = 0;
+		D.end_ix[0] = multithreading->sync_value_int[0] - 1;
+		D.prev_row_array[0] = -1;
+		D.values_ix_array[0] = 0;
+		for (int id = 1; id < multithreading->num_threads; id++)
+		{
+			D.start_ix[id] = D.end_ix[id - 1] + 1;
+			D.end_ix[id] = D.end_ix[id - 1] + multithreading->sync_value_int[id];
+			D.prev_row_array[id] = -1;
+			D.values_ix_array[id] = D.start_ix[id];
+		}
+	}
+	END_HEAD_THREAD_WORK;
+
+	const int start_ix(multithreading->start_ix_1D[thread_id]), end_ix(multithreading->end_ix_1D[thread_id]);
+
+	for (int i = start_ix; i <= end_ix; i++)
+	{
+		D.row_ptr[i] = i;
+	}
+	multithreading->Sync(thread_id);
+
+	for (int i = start_ix; i <= end_ix; i++)
+	{
+		for (int vix = D.row_ptr[i]; vix < D.row_ptr[i + 1]; vix++)
+		{
+			D.column_index[vix] = vix;
+		}
+	}
+	multithreading->Sync(thread_id);
+
+	for (int i = start_ix; i <= end_ix; i++)
+	{
+		D(i, i) = A(i, i);
+	}
+	multithreading->Sync(thread_id);
 }

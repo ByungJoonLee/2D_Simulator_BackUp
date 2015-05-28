@@ -13,6 +13,7 @@ public: // Using keyword
 	using BASE::residual;
 	using BASE::max_iteration;
 	using BASE::num_iteration;
+	using BASE::multithreading;
 
 public: // Essential Data
 	VECTOR_ND<T> res, p, Ap;
@@ -30,7 +31,13 @@ public: // Solver
 		CGMethod(A, x, b);
 	}
 
+	void Solve(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const FIELD_STRUCTURE_2D<int>& bc, const int& thread_id)
+	{
+		CGMethod(A, x, b, thread_id);
+	}
+
 	void CGMethod(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b);
+	void CGMethod(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const int& thread_id);
 };
 
 

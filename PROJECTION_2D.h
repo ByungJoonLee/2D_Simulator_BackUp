@@ -85,12 +85,20 @@ public: // Convenient variables and references
 	// Option for Boundary Condition
 	bool							Dirichlet_Boundary_Condition, Neumann_Boundary_Condition;
 
+	FIELD_STRUCTURE_2D<T>			levelset_x_c, levelset_y_c;
+	FIELD_STRUCTURE_2D<T>			density_half_x, density_half_y;
 public: // Dimensionless Variable
 	T								We;
 	T								R1;
 
+public: // Multithreading
+	MULTITHREADING*					multithreading;
+
+	// Helpful Field
+	FIELD_STRUCTURE_2D<T>			one_over_density;
+
 public: // Constructors and Destructor
-	PROJECTION_2D(LEVELSET_2D& water_levelset_input, LEVELSET_2D& vortex_levelset_input, FIELD_STRUCTURE_2D<T>& velocity_field_mac_x_input, FIELD_STRUCTURE_2D<T>& velocity_field_mac_y_input, FIELD_STRUCTURE_2D<T>& velocity_field_ghost_mac_x_input, FIELD_STRUCTURE_2D<T>& velocity_field_ghost_mac_y_input)
+	PROJECTION_2D(LEVELSET_2D& water_levelset_input, LEVELSET_2D& vortex_levelset_input, FIELD_STRUCTURE_2D<T>& velocity_field_mac_x_input, FIELD_STRUCTURE_2D<T>& velocity_field_mac_y_input, FIELD_STRUCTURE_2D<T>& velocity_field_ghost_mac_x_input, FIELD_STRUCTURE_2D<T>& velocity_field_ghost_mac_y_input, MULTITHREADING* multithreading_input)
 		: water_velocity_field_mac_x(velocity_field_mac_x_input),
 		  water_velocity_field_mac_y(velocity_field_mac_y_input),
 		  vector_field_mac_ghost_x(velocity_field_ghost_mac_x_input),
@@ -106,7 +114,7 @@ public: // Constructors and Destructor
 		  half_dx((T)0.5*dx),
 		  pressure_array(pressure_field.array_for_this), pressure_density_array(projection_density_field.array_for_this), divergence_array(divergence_field.array_for_this),
 		  boundary_condition_array(boundary_condition_field.array_for_this), max_velocity_x(0), max_velocity_y(0), CSF_model(false), Dirichlet_Boundary_Condition(false), Neumann_Boundary_Condition(false),
-		  air_water_simulation(false), oil_water_simulation(false), vortex_sheet_problem(false), dimensionless_form(false)
+		  air_water_simulation(false), oil_water_simulation(false), vortex_sheet_problem(false), dimensionless_form(false), multithreading(multithreading_input)
 	{}
 
 	~PROJECTION_2D(void)
@@ -186,24 +194,33 @@ public: // Initialization Functions
 		}
 
 		// Jump Condition field
-		jc_on_solution.Initialize(base_grid, 1);
-		jc_on_derivative.Initialize(base_grid, 1);
+		jc_on_solution.Initialize(base_grid, 1, multithreading);
+		jc_on_derivative.Initialize(base_grid, 1, multithreading);
 		jc_on_solution.AssignAllValue(0);
 		jc_on_derivative.AssignAllValue(0);
 
 		// Initialize fields
-		pressure_field.Initialize(base_grid, 1);
+		pressure_field.Initialize(base_grid, 1, multithreading);
 		//pressure_field.AssignAllValue((T)0);
-		boundary_condition_field.Initialize(base_grid, 1);
-		divergence_field.Initialize(base_grid, 1);
-		projection_density_field.Initialize(base_grid, 1);
+		boundary_condition_field.Initialize(base_grid, 1, multithreading);
+		divergence_field.Initialize(base_grid, 1, multithreading);
+		projection_density_field.Initialize(base_grid, 1, multithreading);
 
 		// Assigning initial field values
 		projection_density_field.array_for_this.AssignAllValues((T)1);
 
 		// Initialize Poisson solvers
-		poisson_solver.Initialize(tolerance, max_iteration);
+		poisson_solver.Initialize(tolerance, max_iteration, 0, multithreading);
 		poisson_solver.InitializeLinearSolver(poisson_solver_type);
+
+		// Set up the helpful filed
+		one_over_density.Initialize(projection_density_field.grid, 2, multithreading);
+		
+		levelset_x_c.Initialize(water_velocity_field_mac_x.grid, 2, multithreading);
+		levelset_y_c.Initialize(water_velocity_field_mac_y.grid, 2, multithreading);
+
+		density_half_x.Initialize(water_velocity_field_mac_x.grid, 2, multithreading);
+		density_half_y.Initialize(water_velocity_field_mac_y.grid, 2, multithreading);
 	}
 
 public: // Solver
@@ -214,6 +231,21 @@ public: // Solver
 		DetermineJumpConditionField(dt);
 		DeterminePressure();
 		UpdateVelocity(dt);
+	}
+
+	void Solve(const T& dt, const int& thread_id)
+	{
+		DetermineProjectionDensity(thread_id);
+		DetermineDivergence(dt, thread_id);
+		DetermineJumpConditionField(dt, thread_id);
+		//DeterminePressure(thread_id);
+		BEGIN_HEAD_THREAD_WORK
+		{
+			DeterminePressure();
+		}
+		END_HEAD_THREAD_WORK;
+
+		UpdateVelocity(dt, thread_id);
 	}
 
 	void DetermineProjectionDensity(void)
@@ -279,7 +311,79 @@ public: // Solver
 			}
 		}
 	}
-			
+	
+	void DetermineProjectionDensity(const int& thread_id)
+	{
+		if (air_water_simulation)
+		{
+			if (air_bubble_rising)
+			{
+				BEGIN_GRID_ITERATION_2D(projection_density_field.partial_grids[thread_id])
+				{
+					if (water_levelset(i, j) <= 0)
+					{
+						projection_density_field(i, j) = air_density;
+					}
+					else if (water_levelset(i, j) > 0)
+					{
+						projection_density_field(i, j) = water_density;
+					}
+				}
+				END_GRID_ITERATION_2D;
+			}
+			else if (water_drop)
+			{
+				BEGIN_GRID_ITERATION_2D(projection_density_field.partial_grids[thread_id])
+				{
+					if (water_levelset(i, j) <= 0)
+					{
+						projection_density_field(i, j) = water_density;
+					}
+					else if (water_levelset(i, j) > 0)
+					{
+						projection_density_field(i, j) = air_density;
+					}
+				}
+				END_GRID_ITERATION_2D;
+			} 
+		}
+		if (oil_water_simulation)
+		{
+			BEGIN_GRID_ITERATION_2D(projection_density_field.partial_grids[thread_id])
+			{
+				if (dimensionless_form)
+				{
+					if (water_levelset(i, j) <= 0)
+					{
+						projection_density_field(i, j) = water_density/oil_density;
+					}
+					else if (water_levelset(i, j) > 0)
+					{
+						projection_density_field(i, j) = 1;
+					} 
+				}
+				else
+				{
+					if (water_levelset(i, j) <= 0)
+					{
+						projection_density_field(i, j) = water_density;
+					}
+					else if (water_levelset(i, j) > 0)
+					{
+						projection_density_field(i, j) = oil_density;
+					} 
+				}
+			}
+			END_GRID_ITERATION_2D;
+		}
+
+		BEGIN_GRID_ITERATION_2D(one_over_density.partial_grids[thread_id])
+		{
+			one_over_density(i, j) = 1/projection_density_field(i, j);
+		}
+		END_GRID_ITERATION_2D;
+	}
+
 	void DetermineDivergence(const T& dt)	
 	{
 		int i(0), j(0);
@@ -317,6 +421,47 @@ public: // Solver
 			{
 				divergence_field(i, j) *= one_over_dt;
 			}
+		}
+	}
+
+	void DetermineDivergence(const T& dt, const int& thread_id)	
+	{
+		if (air_water_simulation)
+		{
+			BEGIN_GRID_ITERATION_2D(divergence_field.partial_grids[thread_id])
+			{
+				divergence_field(i, j) = one_over_dx*(water_velocity_field_mac_x(i + 1, j) - water_velocity_field_mac_x(i, j)) + one_over_dy*(water_velocity_field_mac_y(i, j + 1) - water_velocity_field_mac_y(i, j));
+			}
+			END_GRID_ITERATION_2D;	
+			// Scaled by time step
+		
+			const T one_over_dt = (T)1/dt;
+        
+			BEGIN_GRID_ITERATION_2D(divergence_field.partial_grids[thread_id])
+			{
+				divergence_field(i, j) *= one_over_dt;
+			}
+			END_GRID_ITERATION_2D;
+		}
+		if (oil_water_simulation)
+		{
+			BEGIN_GRID_ITERATION_2D(divergence_field.partial_grids[thread_id])
+			{
+				T x_min = water_velocity_field_mac_x.grid.x_min, dx = water_velocity_field_mac_x.dx;
+				
+				divergence_field(i, j) = one_over_dx*((x_min + (i + 1)*dx)*water_velocity_field_mac_x(i + 1, j) - (x_min + (i - 1)*dx)*water_velocity_field_mac_x(i, j)) + one_over_dy*((x_min + (i + (T)0.5)*dx)*water_velocity_field_mac_y(i, j + 1) - (x_min + (i + (T)0.5)*dx)*water_velocity_field_mac_y(i, j));
+			}
+			END_GRID_ITERATION_2D;
+				
+			// Scaled by time step
+		
+			const T one_over_dt = (T)1/dt;
+        
+			BEGIN_GRID_ITERATION_2D(divergence_field.partial_grids[thread_id])
+			{
+				divergence_field(i, j) *= one_over_dt;
+			}
+			END_GRID_ITERATION_2D;
 		}
 	}
 
@@ -379,10 +524,77 @@ public: // Solver
 		}
 	}
 
+	
+	void DeterminePressure(const int& thread_id)
+	{
+		SetupBoundaryCondition(pressure_field, boundary_condition_field, water_levelset, thread_id);
+		
+		water_levelset.ComputeNormals(thread_id);
+		
+		BEGIN_GRID_ITERATION_2D(jc_on_derivative.partial_grids[thread_id])
+		{
+			jc_on_derivative(i, j) = (T)0;
+		}
+		END_GRID_ITERATION_2D;
+
+		one_over_density.FillGhostCellsFrom(one_over_density.array_for_this, false, thread_id);
+		multithreading->Sync(thread_id);
+
+		if (air_water_simulation)
+		{
+			poisson_solver.Solve(pressure_field, projection_density_field, boundary_condition_field, divergence_field, one_over_density, water_levelset, jc_on_solution, jc_on_derivative, thread_id);
+		}
+		if (oil_water_simulation)
+		{
+			FIELD_STRUCTURE_2D<T> coef_1, coef_2, coef_3, coef_4;
+			coef_1.Initialize(pressure_field.grid, 2);
+			coef_2.Initialize(pressure_field.grid, 2);
+			coef_3.Initialize(pressure_field.grid, 2);
+			coef_4.Initialize(pressure_field.grid, 2);
+
+			GRID_ITERATION_2D(coef_1.grid)
+			{
+				T x_min = coef_1.grid.x_min, dx = coef_1.grid.dx;
+				coef_1(i, j) = (x_min + (i + (T)0.5)*dx)/((T)0.5*(projection_density_field(i, j) + projection_density_field(i + 1, j)));
+				coef_2(i, j) = (x_min + (i - (T)0.5)*dx)/((T)0.5*(projection_density_field(i, j) + projection_density_field(i - 1, j)));
+				coef_3(i, j) = (x_min + i*dx)/((T)0.5*(projection_density_field(i, j) + projection_density_field(i, j + 1)));
+				coef_4(i, j) = (x_min + i*dx)/((T)0.5*(projection_density_field(i, j) + projection_density_field(i, j - 1)));
+			}
+
+			poisson_solver.SolveForAxisymmetric(pressure_field, coef_1, coef_2, coef_3, coef_4, boundary_condition_field, divergence_field);
+		}
+		if (vortex_sheet_problem)
+		{
+			FIELD_STRUCTURE_2D<T> delta;
+			delta.Initialize(divergence_field.grid, 2);
+
+			DeltaFunction(water_levelset.signed_distance_field, (T)12*delta.grid.dx, delta);
+			jc_on_solution.AssignAllValue((T)0);
+
+			FIELD_STRUCTURE_2D<T> righthand_side;
+			righthand_side.Initialize(divergence_field.grid, 2);
+
+			GRID_ITERATION_2D(divergence_field.grid)
+			{
+				righthand_side(i, j) = delta(i, j)*vortex_levelset(i, j);
+			}
+
+			righthand_side.FillGhostCellsFrom(righthand_side.array_for_this, true);
+
+			poisson_solver.Solve(pressure_field, projection_density_field, boundary_condition_field, righthand_side, water_levelset, jc_on_solution, jc_on_derivative);
+		}
+	}
+
 	void UpdateVelocity(const T& dt)
 	{
 		UpdateVelocityByPressureGradientVariableDensity(water_velocity_field_mac_x, dt);
 		UpdateVelocityByPressureGradientVariableDensity(water_velocity_field_mac_y, dt);
+	}
+
+	void UpdateVelocity(const T& dt, const int& thread_id)
+	{
+		UpdateVelocityByPressureGradientVariableDensity(water_velocity_field_mac_x, dt, thread_id);
+		UpdateVelocityByPressureGradientVariableDensity(water_velocity_field_mac_y, dt, thread_id);
 	}
 
 	void DetermineJumpConditionField(const T& dt)
@@ -436,6 +648,60 @@ public: // Solver
 				T add_cond = (T)2*viscosity_difference*(ux*POW2(water_levelset.normal(i, j).x) + uy*water_levelset.normal(i, j).x*water_levelset.normal(i, j).y + vx*water_levelset.normal(i, j).x*water_levelset.normal(i, j).y + vy*POW2(water_levelset.normal(i, j).y));
 				jc_on_solution(i, j) = surface_tension*curvature + add_cond;
 			}
+		}
+	}
+
+	void DetermineJumpConditionField(const T& dt, const int& thread_id)
+	{
+		water_levelset.ComputeCurvaturesThread(thread_id);
+		
+		if (use_delta_function_formulation)
+		{
+			if (CSF_model)
+			{
+				BEGIN_GRID_ITERATION_2D(jc_on_solution.partial_grids[thread_id])
+				{
+					jc_on_solution(i, j) = (T)0;
+				}
+				END_GRID_ITERATION_2D;
+			}
+			else
+			{
+				BEGIN_GRID_ITERATION_2D(jc_on_solution.partial_grids[thread_id])
+				{
+					jc_on_solution(i, j) = surface_tension*water_levelset.curvature(i, j);
+				}
+				END_GRID_ITERATION_2D;
+			}
+		}
+		else if (use_jump_condition_on_viscosity == true)
+		{
+			T viscosity_p, viscosity_m;
+			if (air_bubble_rising == true)
+			{
+				viscosity_p = water_viscosity;
+				viscosity_m = air_viscosity;
+			}
+			else if (water_drop == true)
+			{
+				viscosity_p = air_viscosity;
+				viscosity_m = water_viscosity;
+			}
+
+			BEGIN_GRID_ITERATION_2D(jc_on_solution.partial_grids[thread_id])
+			{
+				T curvature = water_levelset.curvature(i, j);
+				
+				T viscosity_difference = viscosity_p - viscosity_m;
+				T ux = (T)0.5*(water_velocity_field_mac_x(i + 1, j) + water_velocity_field_mac_x(i + 2, j) - water_velocity_field_mac_x(i - 1, j) - water_velocity_field_mac_x(i, j))*water_velocity_field_mac_x.one_over_2dx;
+				T uy = (T)0.5*(water_velocity_field_mac_x(i, j + 1) + water_velocity_field_mac_x(i + 1, j + 1) - water_velocity_field_mac_x(i, j - 1) - water_velocity_field_mac_x(i + 1, j - 1))*water_velocity_field_mac_x.one_over_2dy;
+				T vx = (T)0.5*(water_velocity_field_mac_y(i + 1, j) + water_velocity_field_mac_y(i + 1, j + 1) - water_velocity_field_mac_y(i - 1, j) - water_velocity_field_mac_y(i - 1, j + 1))*water_velocity_field_mac_y.one_over_2dx;
+				T vy = (T)0.5*(water_velocity_field_mac_y(i, j + 2) + water_velocity_field_mac_y(i, j + 1) - water_velocity_field_mac_y(i, j - 1) - water_velocity_field_mac_y(i, j))*water_velocity_field_mac_y.one_over_2dy;
+
+				T add_cond = (T)2*viscosity_difference*(ux*POW2(water_levelset.normal(i, j).x) + uy*water_levelset.normal(i, j).x*water_levelset.normal(i, j).y + vx*water_levelset.normal(i, j).x*water_levelset.normal(i, j).y + vy*POW2(water_levelset.normal(i, j).y));
+				jc_on_solution(i, j) = surface_tension*curvature + add_cond;
+			}
+			END_GRID_ITERATION_2D;
 		}
 	}
 
@@ -522,6 +788,86 @@ public: // Members Functions
 					bc_array(i, j) = BC_FULL;
 				}
 			}
+		}
+	}
+
+	void SetupBoundaryCondition(FIELD_STRUCTURE_2D<T>& pressure_input, FIELD_STRUCTURE_2D<int>& bc_input, const LEVELSET_2D& water_levelset_input, const int& thread_id)
+	{
+		ARRAY_2D<int>& bc_array(bc_input.array_for_this);
+		GRID_STRUCTURE_2D& grid(bc_input.grid);
+
+		if (Dirichlet_Boundary_Condition)
+		{
+			BEGIN_GRID_ITERATION_2D(bc_input.partial_grids_ghost[thread_id])
+			{
+				// Speed-up variable
+				if (i < grid.i_start || i > grid.i_end || j < grid.j_start || j > grid.j_end)
+				{
+					bc_array(i, j) = BC_DIR;
+					if (vortex_sheet_problem)
+					{
+						if (j == grid.j_start - 1)
+						{
+							pressure_input(i, j) = 0;
+						}
+						if (j == grid.j_end + 1)
+						{
+							pressure_input(i, j) = 0;
+						}
+						if (i == grid.i_start - 1)
+						{
+							pressure_input(i, j) = pressure_input(grid.i_end - 1, j);
+						}
+						if (i == grid.i_end + 1)
+						{
+							pressure_input(i, j) = pressure_input(grid.i_start + 1, j);
+						}
+					}
+					else
+					{
+						pressure_input(i, j) = (T)0;
+					}
+				}
+				else
+				{
+					bc_array(i, j) = BC_FULL;
+				}
+			}
+			END_GRID_ITERATION_2D;
+		}
+		
+		if (Neumann_Boundary_Condition)
+		{
+			BEGIN_GRID_ITERATION_2D(bc_input.partial_grids_ghost[thread_id])
+			{
+				// Speed-up variable
+				if (i < grid.i_start || i > grid.i_end || j < grid.j_start || j > grid.j_end)
+				{
+					bc_array(i, j) = BC_NEUM;
+					//pressure_input(i, j) = (T)0;
+					/*if (i < grid.i_start)
+					{
+						pressure_input(i, j) = pressure_input(grid.i_start, j);
+					}
+					if (i > grid.i_end)
+					{
+						pressure_input(i, j) = pressure_input(grid.i_end, j);
+					}
+					if (j < grid.j_start)
+					{
+						pressure_input(i, j) = pressure_input(i, grid.j_start);
+					}
+					if (j > grid.j_end)
+					{
+						pressure_input(i, j) = pressure_input(i, grid.j_end);
+					}*/
+				}
+				else
+				{
+					bc_array(i, j) = BC_FULL;
+				}
+			}
+			END_GRID_ITERATION_2D;
 		}
 	}
 
@@ -622,20 +968,11 @@ public: // Members Functions
 		}
 		else
 		{
-			// Set up the half density field
-			FIELD_STRUCTURE_2D<T> levelset_x_c, levelset_y_c;
-			levelset_x_c.Initialize(velocity_field.grid, 2);
-			levelset_y_c.Initialize(velocity_field.grid, 2);
-
 			GRID_ITERATION_2D(velocity_field.grid)
 			{
 				levelset_x_c(i, j) = (T)0.5*(water_levelset(i, j) + water_levelset(i - 1, j));
 				levelset_y_c(i, j) = (T)0.5*(water_levelset(i, j) + water_levelset(i, j - 1));
 			}
-
-			FIELD_STRUCTURE_2D<T> density_half_x, density_half_y;
-			density_half_x.Initialize(velocity_field.grid, 2);
-			density_half_y.Initialize(velocity_field.grid, 2);
 
 			// Sharp density Capturing
 			DetermineDensityField(levelset_x_c, (T)1.5*base_grid.dx, density_half_x);
@@ -711,6 +1048,163 @@ public: // Members Functions
 		}
 	}
 
+	void UpdateVelocityByPressureGradientVariableDensity(FIELD_STRUCTURE_2D<T>& velocity_field, const T dt, const int& thread_id)
+	{
+		if (CSF_model)
+		{
+			if (oil_water_simulation)
+			{
+				BEGIN_GRID_ITERATION_2D(velocity_field.partial_grids[thread_id])
+				{
+					if (boundary_condition_array(i, j) < 0)
+					{
+						continue;
+					}
+
+					T& velocity_ij = velocity_field.array_for_this(i, j);
+
+					const T one_over_density_half_x = (T)1/((T)0.5*(projection_density_field(i, j) + projection_density_field(i - 1, j)));
+					const T one_over_density_half_y = (T)1/((T)0.5*(projection_density_field(i, j) + projection_density_field(i, j - 1)));
+
+					if (velocity_field.is_x_component == true)
+					{
+						velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i - 1, j))*one_over_density_half_x*one_over_dx;
+
+						max_velocity_x = MAX(abs(velocity_ij), max_velocity_x);
+
+					}
+					if (velocity_field.is_y_component == true)
+					{
+						velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i, j - 1))*one_over_density_half_y*one_over_dy;
+
+						max_velocity_y = MAX(abs(velocity_ij), max_velocity_y);
+					}
+				}
+				END_GRID_ITERATION_2D;
+			}
+		}
+		else
+		{
+			if (velocity_field.is_x_component)
+			{
+				BEGIN_GRID_ITERATION_2D(velocity_field.partial_grids[thread_id])
+				{
+					levelset_x_c(i, j) = (T)0.5*(water_levelset(i, j) + water_levelset(i - 1, j));
+				}
+				END_GRID_ITERATION_2D;
+
+				DetermineDensityField(levelset_x_c, (T)1.5*base_grid.dx, density_half_x, thread_id);
+			}
+
+			if (velocity_field.is_y_component)
+			{
+				BEGIN_GRID_ITERATION_2D(velocity_field.partial_grids[thread_id])
+				{
+					levelset_y_c(i, j) = (T)0.5*(water_levelset(i, j) + water_levelset(i, j - 1));
+				}
+				END_GRID_ITERATION_2D;
+			
+				DetermineDensityField(levelset_y_c, (T)1.5*base_grid.dy, density_half_y, thread_id);
+			}
+
+			if (velocity_field.is_x_component == true)
+			{
+				max_velocity_x = 0;
+			
+				BEGIN_GRID_ITERATION_2D(velocity_field.partial_grids[thread_id])
+				{
+					if (boundary_condition_array(i, j) < 0)
+					{
+						continue;
+					}
+
+					T& velocity_ij = velocity_field.array_for_this(i, j);
+
+					const T density_ij = projection_density_field(i, j);
+					const T one_over_density_ij = (T)1/density_ij;
+					const T levelset_ij = water_levelset(i, j);
+					const T levelset_ij_l = water_levelset(i - 1, j);
+					const T levelset_ij_b = water_levelset(i, j - 1);
+					const T one_over_density_half_x = (T)1/density_half_x(i, j);
+					const T one_over_density_half_y = (T)1/density_half_y(i, j);
+					const T jump_condition = jc_on_solution(i, j);
+					const T jump_condition_l = jc_on_solution(i - 1, j);
+					const T jump_condition_b = jc_on_solution(i, j - 1);
+
+					const T jump_condition_gamma_x = (jump_condition_l*abs(levelset_ij) + jump_condition*abs(levelset_ij_l))/(abs(levelset_ij) + abs(levelset_ij_l));
+					const T jump_condition_gamma_y = (jump_condition_b*abs(levelset_ij) + jump_condition*abs(levelset_ij_b))/(abs(levelset_ij) + abs(levelset_ij_b));
+
+				
+					if (levelset_ij*levelset_ij_l >= 0)
+					{
+						velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i - 1, j))*one_over_density_ij*one_over_dx;
+					}
+					else
+					{
+						if (levelset_ij < 0)
+						{
+							velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i - 1, j) + jump_condition_gamma_x)*one_over_density_half_x*one_over_dx;
+						}
+						else if (levelset_ij > 0)
+						{
+							//velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i - 1, j) - jump_condition)*one_over_density_half_x*one_over_dx;
+							velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i - 1, j) - jump_condition_gamma_x)*one_over_density_half_x*one_over_dx;
+						}
+					}
+					max_velocity_x = MAX(abs(velocity_ij), max_velocity_x);
+				}
+				END_GRID_ITERATION_MAX_2D(max_velocity_x);
+			}
+
+			if (velocity_field.is_y_component == true)
+			{
+			    BEGIN_GRID_ITERATION_2D(velocity_field.partial_grids[thread_id])
+				{
+					if (boundary_condition_array(i, j) < 0)
+					{
+						continue;
+					}
+
+					T& velocity_ij = velocity_field.array_for_this(i, j);
+
+					const T density_ij = projection_density_field(i, j);
+					const T one_over_density_ij = (T)1/density_ij;
+					const T levelset_ij = water_levelset(i, j);
+					const T levelset_ij_l = water_levelset(i - 1, j);
+					const T levelset_ij_b = water_levelset(i, j - 1);
+					const T one_over_density_half_x = (T)1/density_half_x(i, j);
+					const T one_over_density_half_y = (T)1/density_half_y(i, j);
+					const T jump_condition = jc_on_solution(i, j);
+					const T jump_condition_l = jc_on_solution(i - 1, j);
+					const T jump_condition_b = jc_on_solution(i, j - 1);
+
+					const T jump_condition_gamma_x = (jump_condition_l*abs(levelset_ij) + jump_condition*abs(levelset_ij_l))/(abs(levelset_ij) + abs(levelset_ij_l));
+					const T jump_condition_gamma_y = (jump_condition_b*abs(levelset_ij) + jump_condition*abs(levelset_ij_b))/(abs(levelset_ij) + abs(levelset_ij_b));
+				
+					if (levelset_ij*levelset_ij_b >= 0)
+					{
+						velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i, j - 1))*one_over_density_ij*one_over_dy;
+					}
+					else
+					{
+						if (levelset_ij < 0)
+						{
+							//velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i, j - 1) + jump_condition)*one_over_density_half_y*one_over_dy;
+							velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i, j - 1) + jump_condition_gamma_y)*one_over_density_half_y*one_over_dy;
+						}
+						else if (levelset_ij > 0)
+						{
+							//velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i, j - 1) - jump_condition)*one_over_density_half_y*one_over_dy;
+							velocity_ij -= dt*(pressure_field(i, j) - pressure_field(i, j - 1) - jump_condition_gamma_y)*one_over_density_half_y*one_over_dy;
+						}
+					}
+					max_velocity_y = MAX(abs(velocity_ij), max_velocity_y);
+				}
+				END_GRID_ITERATION_MAX_2D(max_velocity_y);
+			}
+		}
+	}
+
 	void HeavisideFunction(FIELD_STRUCTURE_2D<T>& phi, const T& epsilon, FIELD_STRUCTURE_2D<T>& heaviside)
 	{
 		int i(0), j(0);
@@ -732,6 +1226,27 @@ public: // Members Functions
                 heaviside(i, j) = (T)0.5 + phi(i, j)*one_over_epsilon*(T)0.5 + (T)0.5*one_over_pi*sin(PI*phi(i, j)*one_over_epsilon);
 			}
 		}
+	}
+
+	void HeavisideFunction(FIELD_STRUCTURE_2D<T>& phi, const T& epsilon, FIELD_STRUCTURE_2D<T>& heaviside, const int& thread_id)
+	{
+		BEGIN_GRID_ITERATION_2D(phi.partial_grids[thread_id])
+		{
+			if (phi(i, j) < - epsilon)
+			{
+				heaviside(i, j) = 0;
+			}
+			else if (phi(i, j) > epsilon)
+			{
+				heaviside(i, j) = 1;
+			}
+			else
+			{
+				T one_over_epsilon = (T)1/epsilon, one_over_pi = (T)1/PI;
+                heaviside(i, j) = (T)0.5 + phi(i, j)*one_over_epsilon*(T)0.5 + (T)0.5*one_over_pi*sin(PI*phi(i, j)*one_over_epsilon);
+			}
+		}
+		END_GRID_ITERATION_2D;
 	}
 
 	void DeltaFunction(FIELD_STRUCTURE_2D<T>& phi, const T& epsilon, FIELD_STRUCTURE_2D<T>& delta)
@@ -775,6 +1290,33 @@ public: // Members Functions
 			}
 		}	
 		density.FillGhostCellsFrom(density.array_for_this, true);
+	}
+
+	void DetermineDensityField(FIELD_STRUCTURE_2D<T>& phi, const T& epsilon, FIELD_STRUCTURE_2D<T>& density, const int& thread_id)	
+	{
+		FIELD_STRUCTURE_2D<T> heaviside_phi;
+		heaviside_phi.Initialize(density.grid, 2, multithreading);
+
+		HeavisideFunction(phi, epsilon, heaviside_phi, thread_id);
+		
+		multithreading->Sync(thread_id);
+
+		BEGIN_GRID_ITERATION_2D(phi.partial_grids[thread_id])
+		{
+			if (air_bubble_rising == true)
+			{
+				density(i, j) = air_density + (water_density - air_density)*heaviside_phi(i, j);
+			}
+			else if (water_drop == true)
+			{
+				density(i, j) = water_density + (air_density - water_density)*heaviside_phi(i, j);
+			}
+		}
+		END_GRID_ITERATION_2D;
+
+		density.FillGhostCellsFrom(density.array_for_this, true, thread_id);
+
+		multithreading->Sync(thread_id);
 	}
 };
 

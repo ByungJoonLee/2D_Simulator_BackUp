@@ -1,6 +1,7 @@
 #pragma once
 
 #include "COMMON_DEFINITION.h"
+#include "MULTITHREADING.h"
 
 template<class TT>
 class VECTOR_ND
@@ -250,6 +251,23 @@ inline static T DotProduct(const VECTOR_ND<T>& v1, const VECTOR_ND<T>& v2)
 	return sum;
 }
 
+inline static T DotProduct(const VECTOR_ND<T>& v1, const VECTOR_ND<T>& v2, MULTITHREADING* multithreading, const int& thread_id)
+{
+	assert(v1.num_dimension == v2.num_dimension);
+
+	T *v1_values = v1.values, *v2_values = v2.values;
+
+	const int start_ix(multithreading->start_ix_1D[thread_id]), end_ix(multithreading->end_ix_1D[thread_id]);
+
+	T dot_product = (T)0;
+
+	for(int i = start_ix; i <= end_ix; i++) dot_product += v1_values[i]*v2_values[i];
+
+	multithreading->SyncSum(thread_id, dot_product);
+
+	return dot_product;
+}
+
 inline static void DotProduct(const VECTOR_ND<T>& v1, const VECTOR_ND<T>& v2, T& dot_result)
 {
 	assert(v1.num_dimension == v2.num_dimension);
@@ -260,6 +278,21 @@ inline static void DotProduct(const VECTOR_ND<T>& v1, const VECTOR_ND<T>& v2, T&
 	{
 		dot_result += v1.values[i]*v2.values[i];
 	}
+}
+
+inline static void DotProduct(const VECTOR_ND<T>& v1, const VECTOR_ND<T>& v2, T& dot_result, MULTITHREADING* multithreading, const int& thread_id)
+{
+	assert(v1.num_dimension == v2.num_dimension);
+
+	T *v1_values = v1.values, *v2_values = v2.values;
+
+	const int start_ix(multithreading->start_ix_1D[thread_id]), end_ix(multithreading->end_ix_1D[thread_id]);
+
+	dot_result = (T)0;
+
+	for(int i = start_ix; i <= end_ix; i++) dot_result += v1_values[i]*v2_values[i];
+
+	multithreading->SyncSum(thread_id, dot_result);
 }
 
 template<class T>

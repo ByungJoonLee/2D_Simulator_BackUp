@@ -35,9 +35,18 @@ public: // Dynamic Data
 
 	// Vortex Levelset
 	LEVELSET_2D*					vortex_levelset;
-
+	FIELD_STRUCTURE_2D<T>           magnitude_of_gradient_old;
+	FIELD_STRUCTURE_2D<T>			magnitude_of_gradient_new;
+	FIELD_STRUCTURE_2D<T>           temp_for_vortex;
+	
 	WORLD_DISCRETIZATION_2D*		world_discretization;
 
+	// Levelset For Runge-Kutta Method
+	FIELD_STRUCTURE_2D<T>			temp_for_levelset;
+
+	// Sub-Function for Reinitialization
+	FIELD_STRUCTURE_2D<T>           sign_function;
+	FIELD_STRUCTURE_2D<T>           phi_0;
 public: // Ghost Fields
 	FIELD_STRUCTURE_2D<T>			scalar_field_ghost;
 	FIELD_STRUCTURE_2D<VT>			vector_field_ghost;
@@ -66,6 +75,9 @@ public: // Dimensionless Number
 
 public: // CFL number
 	T								cfl_number;
+
+public: // For CFL TimeStep Debugging
+	T								c_f, g_f, s_f, v_f;
 
 public: // Scaling number for Reinitialization
 	int								scaling_number_for_reinitialization;
@@ -107,6 +119,9 @@ public: // Speed up variable
 public: // Multithreading
 	MULTITHREADING*					multithreading;
 
+public: // Option for Time Marching
+	int								order_for_time_advancing;
+
 public: // Constructor and Destructor
 	EULERIAN_FLUID_SOLVER_2D(void)
 		: advecting_field_variables(0), water_projection(0), water_levelset(0), viscosity_solver(0), vortex_levelset(0), water_velocity_field(0), water_velocity_field_mac_x(0), water_velocity_field_mac_y(0),
@@ -116,7 +131,7 @@ public: // Constructor and Destructor
 		use_delta_function_formulation(false), use_jump_condition_on_viscosity(false), 
 		CSF_model(false), is_vertical(false), is_parallel(false), 
 		use_rk_3rd(false), use_rk_3rd_for_reinitialization(false), use_mac_grid(false),
-		multithreading(0)
+		multithreading(0), order_for_time_advancing((int)1)
 	{}
 
 	~EULERIAN_FLUID_SOLVER_2D(void)
@@ -132,7 +147,7 @@ public: // Constructor and Destructor
 	}
 
 public: // Initialization Functions
-	void InitializeFromScriptBlock(const SCRIPT_BLOCK& script_block, MULTITHREADING* multithreading_input = 0)
+	void InitializeFromScriptBlock(const SCRIPT_BLOCK& script_block, MULTITHREADING* multithreading_input)
 	{
 		// Initialize grids from outside
 		SCRIPT_BLOCK grid_sb = script_block.FindBlock("GRID_STRUCTURE_2D");
@@ -142,7 +157,7 @@ public: // Initialization Functions
 		InitializeFromScriptBlock(base_grid, script_block, multithreading_input);
 	}
 
-	void InitializeFromScriptBlock(const GRID_STRUCTURE_2D& world_grid, const SCRIPT_BLOCK& fluid_solver_block, MULTITHREADING* multithreading_input = 0)
+	void InitializeFromScriptBlock(const GRID_STRUCTURE_2D& world_grid, const SCRIPT_BLOCK& fluid_solver_block, MULTITHREADING* multithreading_input)
 	{
 		// Simulation properties from script
 		int ghost_width = fluid_solver_block.GetInteger("ghost_width", 3);
@@ -191,6 +206,9 @@ public: // Initialization Functions
 		{
 			dimensionless_form = fluid_solver_block.GetBoolean("dimensionless_form", (bool)false);
 		}
+
+		// Time marching order
+		order_for_time_advancing = fluid_solver_block.GetInteger("order_for_time_advancing", (int)1);
 
 		// For the pipe location
 		if (oil_water_simulation)
@@ -252,6 +270,19 @@ public: // Initialization Functions
 			}
 		}
 				
+		if (order_for_time_advancing == 1)
+		{
+			cout << "Time advancing: Forward Euler" << endl;
+		}
+		if (order_for_time_advancing == 2)
+		{
+			cout << "Time advancing: Runge-Kutta 2nd" << endl;
+		}
+		if (order_for_time_advancing == 3)
+		{
+			cout << "Time advancing: Runge-Kutta 3rd" << endl;
+		}
+
 		if (use_rk_3rd)
 		{
 			cout << "Use RK 3rd : true" << endl;
@@ -300,9 +331,15 @@ public: // Initialization Functions
 			}
 		}
 		
+		// Grid
 		base_grid.Initialize(world_grid);
 		ghost_grid.Initialize(base_grid.Enlarged(ghost_width));
 
+		// Multithreading
+		multithreading = multithreading_input;
+		base_grid.SplitInYDirection(multithreading->num_threads, partial_base_grids);
+		ghost_grid.SplitInYDirection(multithreading->num_threads, partial_ghost_grids);
+		
 		// Epsilon for Mollification
 		epsilon_for_mollification = (T)1.5*base_grid.dx;
 		
@@ -310,7 +347,7 @@ public: // Initialization Functions
 		DELETE_POINTER(water_velocity_field);
 		water_velocity_field = new FIELD_STRUCTURE_2D<VT>();
 		water_velocity_field->Initialize(base_grid.i_res, base_grid.j_res, base_grid.i_start, base_grid.j_start, base_grid.x_min, base_grid.y_min, base_grid.x_max, base_grid.y_max, 2, false, true, multithreading);
-
+		
 		// Water Velocity Field for MAC grid
 		DELETE_POINTER(water_velocity_field_mac_x);
 		water_velocity_field_mac_x = new FIELD_STRUCTURE_2D<T>();
@@ -347,11 +384,6 @@ public: // Initialization Functions
 		DELETE_POINTER(vortex_levelset);
 		vortex_levelset = new LEVELSET_2D();
 		vortex_levelset->Initialize(base_grid, 2, multithreading);
-
-		// Multithreading
-		multithreading = multithreading_input;
-		base_grid.SplitInYDirection(multithreading->num_threads, partial_base_grids);
-		ghost_grid.SplitInYDirection(multithreading->num_threads, partial_ghost_grids);
 
 		// Initialize the values for MAC grid
 		if (air_water_simulation)
@@ -421,7 +453,7 @@ public: // Initialization Functions
 				}
 			}
 		}
-				
+		
 		// Initialize Advection Solver
 		DELETE_POINTER(advecting_field_variables);
 		advecting_field_variables = new ADVECTION_2D(*water_levelset, scalar_field_ghost, *vortex_levelset, *water_velocity_field, vector_field_ghost, *water_velocity_field_mac_x, *water_velocity_field_mac_y, vector_field_mac_ghost_x, vector_field_mac_ghost_y, *multithreading); 
@@ -436,7 +468,8 @@ public: // Initialization Functions
 		
 		// Initialize Projection Solver
 		DELETE_POINTER(water_projection);
-		water_projection = new PROJECTION_2D(*water_levelset, *vortex_levelset, *water_velocity_field_mac_x, *water_velocity_field_mac_y, vector_field_mac_ghost_x, vector_field_mac_ghost_y);
+		water_projection = new PROJECTION_2D(*water_levelset, *vortex_levelset, *water_velocity_field_mac_x, *water_velocity_field_mac_y, vector_field_mac_ghost_x, vector_field_mac_ghost_y, multithreading);
+		
 		if (air_water_simulation)
 		{
 			water_projection->air_water_simulation = true;
@@ -538,20 +571,82 @@ public: // Initialization Functions
 		// Initialize vortex levelset
 		vortex_levelset->AssignAllValuesLevelset((T)1);
 		vortex_levelset->FillGhostCellsFromPointer(&(vortex_levelset->phi), false);
+		
+		sign_function.Initialize(water_levelset->signed_distance_field.grid, 3, multithreading);
 	}
 
 public: // Advancing
 	void AdvanceOneTimeStep(const T& dt)
 	{
-		if (use_rk_3rd)
+		if (order_for_time_advancing == 1)
 		{
 			cout << "Time step : " << dt << endl;
-			
+
 			if (is_levelset_advection_active)
 			{
 				if (vortex_sheet_problem)
 				{
-					FIELD_STRUCTURE_2D<T> magnitude_of_gradient_old;
+					magnitude_of_gradient_old.Initialize(base_grid, 2);
+
+					water_levelset->ComputeGradient();
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						magnitude_of_gradient_old(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+
+					Levelset_Advection(dt);
+						
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+					
+					Vortex_Advection(dt);
+						
+					vortex_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(vortex_levelset->phi), true);
+				
+					Reinitialization(dt);
+					
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+										
+					magnitude_of_gradient_new.Initialize(base_grid, 2);
+
+					water_levelset->ComputeGradient();
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						magnitude_of_gradient_new(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+				
+					GRID_ITERATION_2D(base_grid)
+					{
+						T ratio_of_gradient = magnitude_of_gradient_new(i, j)/magnitude_of_gradient_old(i, j);
+						vortex_levelset->arr(i, j) = ratio_of_gradient*vortex_levelset->arr(i, j);
+					}
+				}
+				else
+				{
+					Levelset_Advection(dt);
+					
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+
+					Reinitialization(dt);
+				
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+				}
+			}
+			
+			int i(0), j(0);
+			
+			SolveForRK(dt);
+		}
+		
+		if (order_for_time_advancing == 2)
+		{
+			cout << "Time step : " << dt << endl;
+
+			if (is_levelset_advection_active)
+			{
+				if (vortex_sheet_problem)
+				{
 					magnitude_of_gradient_old.Initialize(base_grid, 2);
 
 					water_levelset->ComputeGradient();
@@ -561,7 +656,158 @@ public: // Advancing
 						magnitude_of_gradient_old(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
 					}
 					
-					FIELD_STRUCTURE_2D<T> temp_for_levelset;
+					temp_for_levelset.Initialize(base_grid, 2);
+			
+					GRID_ITERATION_2D(base_grid)
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+
+					Levelset_Advection(dt);
+					Levelset_Advection(dt);
+	
+					GRID_ITERATION_2D(base_grid)
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+						
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+					
+					temp_for_vortex.Initialize(base_grid, 2);
+			
+					GRID_ITERATION_2D(base_grid)
+					{
+						T temp = vortex_levelset->arr(i, j);
+						temp_for_vortex(i, j) = temp;
+					}
+
+					Vortex_Advection(dt);
+					Vortex_Advection(dt);
+	
+					GRID_ITERATION_2D(base_grid)
+					{
+						vortex_levelset->arr(i, j) = (T)0.5*temp_for_vortex(i, j) + (T)0.5*vortex_levelset->arr(i, j);
+					}
+					
+					vortex_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(vortex_levelset->phi), true);
+				
+					temp_for_levelset.Initialize(base_grid, 2);
+			
+					GRID_ITERATION_2D(base_grid)
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+
+					Reinitialization(dt);
+					Reinitialization(dt);
+	
+					GRID_ITERATION_2D(base_grid)
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+					
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+										
+					magnitude_of_gradient_new.Initialize(base_grid, 2);
+
+					water_levelset->ComputeGradient();
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						magnitude_of_gradient_new(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+				
+					GRID_ITERATION_2D(base_grid)
+					{
+						T ratio_of_gradient = magnitude_of_gradient_new(i, j)/magnitude_of_gradient_old(i, j);
+						vortex_levelset->arr(i, j) = ratio_of_gradient*vortex_levelset->arr(i, j);
+					}
+				}
+				else
+				{
+					temp_for_levelset.Initialize(base_grid, 2);
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+
+					Levelset_Advection(dt);
+					Levelset_Advection(dt);
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+
+					temp_for_levelset.Initialize(base_grid, 2);
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+
+					Reinitialization(dt);
+					Reinitialization(dt);
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+				}
+			}
+			
+			int i(0), j(0);
+			
+			GRID_ITERATION_2D(water_velocity_field_mac_x->grid)
+			{
+				T Temp_x = water_velocity_field_mac_x->array_for_this(i, j);
+				water_velocity_field_x_rk_3rd(i, j) = Temp_x;
+			}
+			   GRID_ITERATION_2D(water_velocity_field_mac_y->grid)
+			{
+				T Temp_y = water_velocity_field_mac_y->array_for_this(i, j);
+				water_velocity_field_y_rk_3rd(i, j) = Temp_y;
+			}
+
+			SolveForRK(dt);
+			SolveForRK(dt);
+
+			GRID_ITERATION_2D(water_velocity_field_mac_x->grid)
+			{
+				water_velocity_field_mac_x->array_for_this(i ,j) = (T)0.5*water_velocity_field_x_rk_3rd(i, j) + (T)0.5*water_velocity_field_mac_x->array_for_this(i, j);
+			}
+			GRID_ITERATION_2D(water_velocity_field_mac_y->grid)
+			{
+				water_velocity_field_mac_y->array_for_this(i, j) = (T)0.5*water_velocity_field_y_rk_3rd(i, j) + (T)0.5*water_velocity_field_mac_y->array_for_this(i, j);
+			}
+		}
+
+		if (order_for_time_advancing == 3)
+		{
+			cout << "Time step : " << dt << endl;
+			
+			if (is_levelset_advection_active)
+			{
+				if (vortex_sheet_problem)
+				{
+					magnitude_of_gradient_old.Initialize(base_grid, 2);
+
+					water_levelset->ComputeGradient();
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						magnitude_of_gradient_old(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+					
 					temp_for_levelset.Initialize(base_grid, 2);
 			
 					GRID_ITERATION_2D(base_grid)
@@ -586,7 +832,6 @@ public: // Advancing
 					}
 					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
 					
-					FIELD_STRUCTURE_2D<T> temp_for_vortex;
 					temp_for_vortex.Initialize(base_grid, 2);
 			
 					GRID_ITERATION_2D(base_grid)
@@ -611,39 +856,30 @@ public: // Advancing
 					}
 					vortex_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(vortex_levelset->phi), true);
 				
-					// By RK 3rd
-					if (use_rk_3rd_for_reinitialization)
-					{
-						FIELD_STRUCTURE_2D<T> temp_for_levelset;
-						temp_for_levelset.Initialize(base_grid, 2);
+					temp_for_levelset.Initialize(base_grid, 2);
 			
-						GRID_ITERATION_2D(base_grid)
-						{
-							T temp = water_levelset->arr(i, j);
-							temp_for_levelset(i, j) = temp;
-						}
-
-						Reinitialization(dt);
-						Reinitialization(dt);
-	
-						GRID_ITERATION_2D(base_grid)
-						{
-							water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
-						}
-					
-						Reinitialization(dt);
-	
-						GRID_ITERATION_2D(base_grid)
-						{
-							water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
-						}
-						water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
-					}
-					else    // By Forward Euler
+					GRID_ITERATION_2D(base_grid)
 					{
-						Reinitialization(dt);
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+
+					Reinitialization(dt);
+					Reinitialization(dt);
+	
+					GRID_ITERATION_2D(base_grid)
+					{
+						water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
 					}
 					
+					Reinitialization(dt);
+	
+					GRID_ITERATION_2D(base_grid)
+					{
+						water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
+					}
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+										
 					FIELD_STRUCTURE_2D<T> magnitude_of_gradient_new;
 					magnitude_of_gradient_new.Initialize(base_grid, 2);
 
@@ -662,7 +898,6 @@ public: // Advancing
 				}
 				else
 				{
-					FIELD_STRUCTURE_2D<T> temp_for_levelset;
 					temp_for_levelset.Initialize(base_grid, 2);
 
 					GRID_ITERATION_2D(base_grid)
@@ -687,38 +922,29 @@ public: // Advancing
 					}
 					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
 
-					// By RK 3rd
-					if (use_rk_3rd_for_reinitialization)
+					temp_for_levelset.Initialize(base_grid, 2);
+
+					GRID_ITERATION_2D(base_grid)
 					{
-						FIELD_STRUCTURE_2D<T> temp_for_levelset;
-						temp_for_levelset.Initialize(base_grid, 2);
-
-						GRID_ITERATION_2D(base_grid)
-						{
-							T temp = water_levelset->arr(i, j);
-							temp_for_levelset(i, j) = temp;
-						}
-
-						Reinitialization(dt);
-						Reinitialization(dt);
-
-						GRID_ITERATION_2D(base_grid)
-						{
-							water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
-						}
-
-						Reinitialization(dt);
-
-						GRID_ITERATION_2D(base_grid)
-						{
-							water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
-						}
-						water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
 					}
-					else    // By Forward Euler
+
+					Reinitialization(dt);
+					Reinitialization(dt);
+
+					GRID_ITERATION_2D(base_grid)
 					{
-						Reinitialization(dt);
-					} 
+						water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
+					}
+
+					Reinitialization(dt);
+
+					GRID_ITERATION_2D(base_grid)
+					{
+						water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
+					}
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
 				}
 			}
 			
@@ -735,8 +961,8 @@ public: // Advancing
 				water_velocity_field_y_rk_3rd(i, j) = Temp_y;
 			}
 
-			SolveForRK2(dt);
-			SolveForRK2(dt);
+			SolveForRK(dt);
+			SolveForRK(dt);
 
 			GRID_ITERATION_2D(water_velocity_field_mac_x->grid)
 			{
@@ -747,7 +973,7 @@ public: // Advancing
 				water_velocity_field_mac_y->array_for_this(i, j) = (T)0.75*water_velocity_field_y_rk_3rd(i, j) + (T)0.25*water_velocity_field_mac_y->array_for_this(i, j);
 			}
 
-			SolveForRK2(dt);
+			SolveForRK(dt);
 
 			GRID_ITERATION_2D(water_velocity_field_mac_x->grid)
 			{
@@ -758,9 +984,452 @@ public: // Advancing
 			    water_velocity_field_mac_y->array_for_this(i, j) = 1/(T)3*water_velocity_field_y_rk_3rd(i, j) + 2/(T)3*water_velocity_field_mac_y->array_for_this(i, j);
 			}
 		}
-		else
+	}
+
+	void AdvanceOneTimeStepThread(const T& dt, const int& thread_id = 0)
+	{
+		if (order_for_time_advancing == 1)
 		{
-			Solve(dt);	
+			BEGIN_HEAD_THREAD_WORK
+			{
+				cout << "Time step : " << dt << endl;
+			}
+			END_HEAD_THREAD_WORK;
+
+			if (is_levelset_advection_active)
+			{
+				if (vortex_sheet_problem)
+				{
+					magnitude_of_gradient_old.Initialize(base_grid, 2, multithreading);
+
+					water_levelset->ComputeGradient(thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						magnitude_of_gradient_old(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+					END_GRID_ITERATION_2D;
+
+					Levelset_Advection(dt, thread_id);
+						
+					Vortex_Advection(dt, thread_id);
+						
+					Reinitialization(dt, thread_id);
+					
+					water_levelset->FillGhostCellsContinuousDerivativesFromPointer(&(water_levelset->phi), true);
+										
+					magnitude_of_gradient_new.Initialize(base_grid, 2, multithreading);
+
+					water_levelset->ComputeGradient(thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						magnitude_of_gradient_new(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+					END_GRID_ITERATION_2D;
+				
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T ratio_of_gradient = magnitude_of_gradient_new(i, j)/magnitude_of_gradient_old(i, j);
+						vortex_levelset->arr(i, j) = ratio_of_gradient*vortex_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+				}
+				else
+				{
+					Levelset_Advection(dt, thread_id);
+					
+					Reinitialization(dt, thread_id);
+				}	
+			}
+			
+			SolveForRK(dt, thread_id);
+		}
+		
+		if (order_for_time_advancing == 2)
+		{
+			BEGIN_HEAD_THREAD_WORK
+			{
+				cout << "Time step : " << dt << endl;
+			}
+			END_HEAD_THREAD_WORK;
+
+			if (is_levelset_advection_active)
+			{
+				if (vortex_sheet_problem)
+				{
+					magnitude_of_gradient_old.Initialize(base_grid, 2, multithreading);
+
+					water_levelset->ComputeGradient(thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						magnitude_of_gradient_old(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+					END_GRID_ITERATION_2D;
+
+					temp_for_levelset.Initialize(base_grid, 2, multithreading);
+			
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Levelset_Advection(dt, thread_id);
+					Levelset_Advection(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					temp_for_vortex.Initialize(base_grid, 2);
+			
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = vortex_levelset->arr(i, j);
+						temp_for_vortex(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+					
+					Vortex_Advection(dt, thread_id);
+					Vortex_Advection(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						vortex_levelset->arr(i, j) = (T)0.5*temp_for_vortex(i, j) + (T)0.5*vortex_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					temp_for_levelset.Initialize(base_grid, 2);
+			
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Reinitialization(dt, thread_id);
+					Reinitialization(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					magnitude_of_gradient_new.Initialize(base_grid, 2, multithreading);
+
+					water_levelset->ComputeGradient(thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						magnitude_of_gradient_new(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+					END_GRID_ITERATION_2D;
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T ratio_of_gradient = magnitude_of_gradient_new(i, j)/magnitude_of_gradient_old(i, j);
+						vortex_levelset->arr(i, j) = ratio_of_gradient*vortex_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+				}
+				else
+				{
+					BEGIN_HEAD_THREAD_WORK
+					{
+						temp_for_levelset.Initialize(base_grid, 2, multithreading);
+					}
+					END_HEAD_THREAD_WORK;
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Levelset_Advection(dt, thread_id);
+					Levelset_Advection(dt, thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Reinitialization(dt, thread_id);
+					Reinitialization(dt, thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.5*temp_for_levelset(i, j) + (T)0.5*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+				}
+			}
+			
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_x->partial_grids[thread_id])
+			{
+				T Temp_x = water_velocity_field_mac_x->array_for_this(i, j);
+				water_velocity_field_x_rk_3rd(i, j) = Temp_x;
+			}
+			END_GRID_ITERATION_2D;
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_y->partial_grids[thread_id])
+			{
+				T Temp_y = water_velocity_field_mac_y->array_for_this(i, j);
+				water_velocity_field_y_rk_3rd(i, j) = Temp_y;
+			}
+			END_GRID_ITERATION_2D;
+
+			SolveForRK(dt, thread_id);
+			SolveForRK(dt, thread_id);
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_x->partial_grids[thread_id])
+			{
+				water_velocity_field_mac_x->array_for_this(i ,j) = (T)0.5*water_velocity_field_x_rk_3rd(i, j) + (T)0.5*water_velocity_field_mac_x->array_for_this(i, j);
+			}
+			END_GRID_ITERATION_2D;
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_y->partial_grids[thread_id])
+			{
+				water_velocity_field_mac_y->array_for_this(i, j) = (T)0.5*water_velocity_field_y_rk_3rd(i, j) + (T)0.5*water_velocity_field_mac_y->array_for_this(i, j);
+			}
+			END_GRID_ITERATION_2D;
+		}
+
+		if (order_for_time_advancing == 3)
+		{
+			BEGIN_HEAD_THREAD_WORK
+			{
+				cout << "Time step : " << dt << endl;
+			}
+			END_HEAD_THREAD_WORK;
+			
+			if (is_levelset_advection_active)
+			{
+				if (vortex_sheet_problem)
+				{
+					magnitude_of_gradient_old.Initialize(base_grid, 2, multithreading);
+
+					water_levelset->ComputeGradient(thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						magnitude_of_gradient_old(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+					END_GRID_ITERATION_2D;
+
+					temp_for_levelset.Initialize(base_grid, 2, multithreading);
+			
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Levelset_Advection(dt, thread_id);
+					Levelset_Advection(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					Levelset_Advection(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					temp_for_vortex.Initialize(base_grid, 2, multithreading);
+			
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = vortex_levelset->arr(i, j);
+						temp_for_vortex(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Vortex_Advection(dt, thread_id);
+					Vortex_Advection(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						vortex_levelset->arr(i, j) = (T)0.75*temp_for_vortex(i, j) + (T)0.25*vortex_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					Vortex_Advection(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						vortex_levelset->arr(i, j) = 1/(T)3*temp_for_vortex(i, j) + 2/(T)3*vortex_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+				
+					temp_for_levelset.Initialize(base_grid, 2, multithreading);
+			
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Reinitialization(dt, thread_id);
+					Reinitialization(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+					
+					Reinitialization(dt, thread_id);
+	
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+										
+					magnitude_of_gradient_new.Initialize(base_grid, 2, multithreading);
+
+					water_levelset->ComputeGradient(thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						magnitude_of_gradient_new(i, j) = sqrt(POW2(water_levelset->gradient(i, j).x) + POW2(water_levelset->gradient(i, j).y));
+					}
+					END_GRID_ITERATION_2D;
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T ratio_of_gradient = magnitude_of_gradient_new(i, j)/magnitude_of_gradient_old(i, j);
+						vortex_levelset->arr(i, j) = ratio_of_gradient*vortex_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+				}
+				else
+				{
+					BEGIN_HEAD_THREAD_WORK
+					{
+						temp_for_levelset.Initialize(base_grid, 2, multithreading);
+					}
+					END_HEAD_THREAD_WORK;
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Levelset_Advection(dt, thread_id);
+					Levelset_Advection(dt, thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					Levelset_Advection(dt, thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						T temp = water_levelset->arr(i, j);
+						temp_for_levelset(i, j) = temp;
+					}
+					END_GRID_ITERATION_2D;
+
+					Reinitialization(dt, thread_id);
+					Reinitialization(dt, thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = (T)0.75*temp_for_levelset(i, j) + (T)0.25*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+
+					Reinitialization(dt, thread_id);
+
+					BEGIN_GRID_ITERATION_2D(partial_base_grids[thread_id])
+					{
+						water_levelset->arr(i, j) = 1/(T)3*temp_for_levelset(i, j) + 2/(T)3*water_levelset->arr(i, j);
+					}
+					END_GRID_ITERATION_2D;
+				}
+			}
+			
+			int i(0), j(0);
+			
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_x->partial_grids[thread_id])
+			{
+				T Temp_x = water_velocity_field_mac_x->array_for_this(i, j);
+				water_velocity_field_x_rk_3rd(i, j) = Temp_x;
+			}
+			END_GRID_ITERATION_2D;
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_y->partial_grids[thread_id])
+			{
+				T Temp_y = water_velocity_field_mac_y->array_for_this(i, j);
+				water_velocity_field_y_rk_3rd(i, j) = Temp_y;
+			}
+			END_GRID_ITERATION_2D;
+
+			SolveForRK(dt, thread_id);
+			SolveForRK(dt, thread_id);
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_x->partial_grids[thread_id])
+			{
+				water_velocity_field_mac_x->array_for_this(i ,j) = (T)0.75*water_velocity_field_x_rk_3rd(i, j) + (T)0.25*water_velocity_field_mac_x->array_for_this(i, j);
+			}
+			END_GRID_ITERATION_2D;
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_y->partial_grids[thread_id])
+			{
+				water_velocity_field_mac_y->array_for_this(i, j) = (T)0.75*water_velocity_field_y_rk_3rd(i, j) + (T)0.25*water_velocity_field_mac_y->array_for_this(i, j);
+			}
+			END_GRID_ITERATION_2D;
+
+			SolveForRK(dt, thread_id);
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_x->partial_grids[thread_id])
+			{
+				water_velocity_field_mac_x->array_for_this(i, j) = 1/(T)3*water_velocity_field_x_rk_3rd(i, j) + 2/(T)3*water_velocity_field_mac_x->array_for_this(i, j);
+			}
+			END_GRID_ITERATION_2D;
+			
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_y->partial_grids[thread_id])
+			{
+			    water_velocity_field_mac_y->array_for_this(i, j) = 1/(T)3*water_velocity_field_y_rk_3rd(i, j) + 2/(T)3*water_velocity_field_mac_y->array_for_this(i, j);
+			}
+			END_GRID_ITERATION_2D;
 		}
 	}
 	
@@ -800,7 +1469,7 @@ public: // Advancing
 		}
 	}
 
-	void SolveForRK2(const T& dt)
+	void SolveForRK(const T& dt)
 	{
 		if (is_velocity_advection_active)
 		{
@@ -822,10 +1491,37 @@ public: // Advancing
 		}
 	}
 
+	void SolveForRK(const T& dt, const int& thread_id)
+	{
+		if (is_velocity_advection_active)
+		{
+			Velocity_Advection(dt, thread_id);
+		}
+		
+		ApplyGraivity(dt, thread_id);
+		
+		if (is_sourcing_active)
+		{
+			Sourcing(dt, thread_id);
+		}
+		
+		SetupBoundaryConditionForVelocity();
+		
+		if (is_projection_active)
+		{
+			Projection(dt, thread_id);
+		}
+	}
+
 public: // Simulation Steps
 	void Velocity_Advection(const T& dt)
 	{
 		advecting_field_variables->Solve_Velocity(dt);
+	}
+
+	void Velocity_Advection(const T& dt, const int& thread_id)
+	{
+		advecting_field_variables->Solve_Velocity(dt, thread_id);
 	}
 
 	void Levelset_Advection(const T& dt)
@@ -835,9 +1531,22 @@ public: // Simulation Steps
 		water_levelset->FillGhostCellsContinuousDerivativesFrom(water_levelset->phi, true);
 	}
 
+	void Levelset_Advection(const T& dt, const int& thread_id)
+	{
+		water_levelset->ComputeNormals();
+		advecting_field_variables->Solve_Levelset(dt, thread_id);
+		water_levelset->FillGhostCellsContinuousDerivativesFrom(water_levelset->phi, true);
+	}
+
 	void Vortex_Advection(const T& dt)
 	{
 		advecting_field_variables->Solve_Vortex(dt);
+		vortex_levelset->FillGhostCellsFrom(vortex_levelset->phi, true);
+	}
+
+	void Vortex_Advection(const T& dt, const int& thread_id)
+	{
+		advecting_field_variables->Solve_Vortex(dt, thread_id);
 		vortex_levelset->FillGhostCellsFrom(vortex_levelset->phi, true);
 	}
 
@@ -858,6 +1567,23 @@ public: // Simulation Steps
 		}
 	}
 	
+	void Sourcing(const T& dt, const int& thread_id)
+	{
+		DetermineDensity(thread_id);
+				
+		if (is_viscosity_active)
+		{
+			viscosity_solver->ApplyViscosity(epsilon_for_mollification, dt, thread_id);
+			//ApplyViscosity(dt);
+		}
+						
+		if (CSF_model)
+		{
+			ApplySurfaceTension(dt);
+			water_projection->CSF_model = true;
+		}
+	}
+
 	void DetermineDensity(void)
 	{
 		if (air_water_simulation)
@@ -874,7 +1600,7 @@ public: // Simulation Steps
 					{
 						density_field(i, j) = water_density;
 					}
-				}	
+				}
 			}
 			else if (water_projection->water_drop)
 			{
@@ -888,7 +1614,72 @@ public: // Simulation Steps
 					{
 						density_field(i, j) = air_density;
 					}
-				}	
+				}
+			} 
+		}
+		if (oil_water_simulation)
+		{
+			GRID_ITERATION_2D(density_field.grid)
+			{
+				if (dimensionless_form)
+				{
+					if (water_levelset->arr(i, j) <= 0)
+					{
+						density_field(i, j) = water_density/oil_density;
+					}
+					else
+					{
+						density_field(i, j) = 1;
+					}
+				}
+				else
+				{
+					if (water_levelset->arr(i, j) <= 0)
+					{
+						density_field(i, j) = oil_density;
+					}
+					else
+					{
+						density_field(i, j) = water_density;
+					}
+				}
+			}
+		}
+	}
+
+	void DetermineDensity(const int& thread_id)
+	{
+		if (air_water_simulation)
+		{
+			if (water_projection->air_bubble_rising)
+			{
+				BEGIN_GRID_ITERATION_2D(water_levelset->partial_grids[thread_id])
+				{
+					if (water_levelset->arr(i, j) <= 0)
+					{
+						density_field(i, j) = air_density;
+					}
+					else if (water_levelset->arr(i, j) > 0)
+					{
+						density_field(i, j) = water_density;
+					}
+				}
+				END_GRID_ITERATION_2D;
+			}
+			else if (water_projection->water_drop)
+			{
+				BEGIN_GRID_ITERATION_2D(water_levelset->partial_grids[thread_id])
+				{
+					if (water_levelset->arr(i, j) <= 0)
+					{
+						density_field(i, j) = water_density;
+					}
+					else if (water_levelset->arr(i, j) > 0)
+					{
+						density_field(i, j) = air_density;
+					}
+				}
+				END_GRID_ITERATION_2D;
 			} 
 		}
 		if (oil_water_simulation)
@@ -1053,6 +1844,12 @@ public: // Simulation Steps
 		water_projection->Solve(dt);
 	}
 
+	void Projection(const T& dt, const int& thread_id)
+	{
+		water_projection->surface_tension = surface_tension;
+		water_projection->Solve(dt, thread_id);
+	}
+
 	void Reinitialization(const T& dt)
 	{
 		if (fastsweeping_reinitialization)
@@ -1066,26 +1863,13 @@ public: // Simulation Steps
 			
 			int iter(0);
 			
-			FIELD_STRUCTURE_2D<T> sign_function;
 			sign_function.Initialize(water_levelset->signed_distance_field.grid, 3);
 
-			/*ofstream fout;
-			fout.open("sign_function");*/
 			GRID_ITERATION_2D(sign_function.grid)
 			{
 				sign_function(i, j) = water_levelset->arr(i, j)/sqrt(POW2(water_levelset->arr(i, j)) + POW2(water_levelset->grid.dx));
 			}
 			
-			/*for (int j = sign_function.j_start; j <= sign_function.j_end; j++)
-			{
-				for (int i = sign_function.i_start; i <= sign_function.i_end; i++)
-					fout << sign_function(i, j) << " ";
-	
-				fout << "\n";
-			}
-			fout.close();*/
-				
-			FIELD_STRUCTURE_2D<T> phi_0;
 			phi_0.Initialize(water_levelset->grid, 2);
 
 			GRID_ITERATION_2D(phi_0.grid)
@@ -1094,38 +1878,37 @@ public: // Simulation Steps
 			}
 			phi_0.FillGhostCellsContinuousDerivativesFrom(phi_0.array_for_this, true);
 			
-			
-			/*char tempname[100];
-			sprintf(tempname,"A Remark on Computing Distance Functions/2D Example/norm_1_%d_%d_w", base_grid.i_res - 1, base_grid.j_res - 1);
-			fout.open(tempname);*/
-			
 			while (iter < iteration_number_for_reinitialization)
 			{
-				/*T l_1norm(0);
-				char tempname[100];
-				sprintf(tempname,"A Remark on Computing Distance Functions/2D Example/%d", iter);
-				fout.open(tempname);*/
-				
-				//for (int j = base_grid.j_start; j <= base_grid.j_end; j++)
-				//{
-				//	for (int i = base_grid.i_start; i <= base_grid.i_end; i++)
-				//	{
-				//		fout << water_levelset->arr(i, j) << " ";
-				//	}
-				//	fout << "\n";
-				//}
-				////fout << l_1norm << endl;
-				//fout.close();
+				advecting_field_variables->ReinitializationBySussman(fictious_dt, sign_function);
+				iter = iter + 1;
+			}
+			
+		}
+	}
 
-				advecting_field_variables->ReinitializationBySussman(fictious_dt, sign_function, phi_0);
-				
-				/*GRID_ITERATION_2D(base_grid)
-				{
-					l_1norm += base_grid.dx2*abs(water_levelset->arr(i, j) - water_levelset->exact_solution(i, j));
-				}
-				
-				l_1norm = log10(l_1norm);*/
-								
+	void Reinitialization(const T& dt, const int& thread_id)
+	{
+		if (fastsweeping_reinitialization)
+		{
+			water_levelset->FastSweepingMethodOriginal(4);
+			//water_levelset->FastSweepingMethod();
+		}
+		if (sussmanstyle_reinitialization)
+		{
+			T fictious_dt = base_grid.dx/(T)scaling_number_for_reinitialization;
+			
+			int iter(0);
+			
+			BEGIN_GRID_ITERATION_2D(sign_function.partial_grids[thread_id])
+			{
+				sign_function(i, j) = water_levelset->arr(i, j)/sqrt(POW2(water_levelset->arr(i, j)) + POW2(water_levelset->grid.dx));
+			}
+			END_GRID_ITERATION_2D;
+
+			while (iter < iteration_number_for_reinitialization)
+			{
+				advecting_field_variables->ReinitializationBySussman(fictious_dt, sign_function, thread_id);
 				iter = iter + 1;
 			}
 			
@@ -1815,6 +2598,54 @@ public:	// Sourcing Functions
 		SetupBoundaryConditionForVelocity();
 	}
 
+	void ApplyGraivity(const T& dt, const int& thread_id)
+	{
+		const VT gravity_dt(dt*gravity);
+		
+		if (air_water_simulation)
+		{
+			ARRAY_2D<T>& water_velocity_x(water_velocity_field_mac_x->array_for_this);
+			ARRAY_2D<T>& water_velocity_y(water_velocity_field_mac_y->array_for_this);
+
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_x->partial_grids[thread_id])
+			{
+				water_velocity_x(i, j) += gravity_dt.x;
+			}	
+			END_GRID_ITERATION_2D;
+			
+			BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_y->partial_grids[thread_id])
+			{
+				water_velocity_y(i, j) += gravity_dt.y;
+			} 
+			END_GRID_ITERATION_2D;
+		}
+		if (oil_water_simulation)
+		{
+			if (dimensionless_form)
+			{
+				if (is_vertical)
+				{
+					ARRAY_2D<T>& water_velocity_x(water_velocity_field_mac_x->array_for_this);
+					ARRAY_2D<T>& water_velocity_y(water_velocity_field_mac_y->array_for_this);
+
+					BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_x->partial_grids[thread_id])
+					{
+						water_velocity_x(i, j) += R1/POW2(V0)*gravity_dt.x;
+					}
+					END_GRID_ITERATION_2D;
+
+					BEGIN_GRID_ITERATION_2D(water_velocity_field_mac_y->partial_grids[thread_id])
+					{
+						water_velocity_y(i, j) += R1/POW2(V0)*gravity_dt.y;
+						// Driving Pressure
+						water_velocity_y(i, j) += dt*R1/(POW2(V0)*oil_density)*f;
+					}   
+					END_GRID_ITERATION_2D;
+				}
+			}
+		}
+	}
+
 	void ApplySurfaceTension(const T& dt)
 	{
 		if (air_water_simulation)
@@ -1978,7 +2809,7 @@ public:	// Sourcing Functions
 	}
 	
 public: // Functions related to the time
-	T CFLtimecondition(void)
+	T CFLOneTimeStep(void)
 	{
 		T u_max(0), v_max(0);
 		
@@ -1999,9 +2830,10 @@ public: // Functions related to the time
 		}
 		
 		// CFL condition For Advection Term
-		T c_f = (u_max*water_velocity_field_mac_x->grid.one_over_dx + v_max*water_velocity_field_mac_y->grid.one_over_dy);
+		c_f = (u_max*water_velocity_field_mac_x->grid.one_over_dx + v_max*water_velocity_field_mac_y->grid.one_over_dy);
 		
-		T g_f(0);
+		g_f = 0;
+		
 		// CFL condition For Gravity Term
 		if (air_water_simulation)
 		{
@@ -2020,7 +2852,7 @@ public: // Functions related to the time
 		}
 
 		// CFL condition For Viscosity Term
-		T v_f(0);
+		v_f = 0;
 		if (air_water_simulation)
 		{
 			v_f = max(water_viscosity/water_density, air_viscosity/air_density)*((T)2*base_grid.one_over_dx2 + (T)2*base_grid.one_over_dy2);
@@ -2047,7 +2879,7 @@ public: // Functions related to the time
 			}
 		}
 
-		T s_f(0);
+		s_f = 0;
 		if (air_water_simulation)
 		{
 			s_f = sqrt(surface_tension*max_abs_cur/(min(water_density, air_density)*(POW2(min(base_grid.dx, base_grid.dy)))));

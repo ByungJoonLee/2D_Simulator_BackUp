@@ -2,12 +2,13 @@ SIMULATION_WORLD
 {
 	// simulation properties
 	dt = 0.000001
+	CFL = 0.9
 	
 	// simulation options
 	use_eulerian_solver	= true
 	
 	// Number of threads
-	number_of_threads       = 2
+	number_of_threads       = 16
 
 	// options for example
 	air_water_simulation    = true
@@ -89,9 +90,9 @@ FLUID_SOLVER_UNIFORM_AIR_WATER
 	scaling_number_for_reinitialization = 5
 	iteration_number_for_reinitialization = 25
 	
-	use_rk_3rd = true
+	use_rk_3rd = false
 	use_mac_grid = true
-	use_rk_3rd_for_reinitialization = true
+	use_rk_3rd_for_reinitialization = false
 	
 	CSF_model = false
 
@@ -101,6 +102,8 @@ FLUID_SOLVER_UNIFORM_AIR_WATER
 	curvature_by_normal_vector = false
 	curvature_by_levelset = true
 
+	order_for_time_advancing = 2
+	
 	LEVELSET_ADVECTION
 	{
 		use_5th_weno = true
@@ -154,7 +157,7 @@ FLUID_SOLVER_UNIFORM_OIL_WATER
 {
 	is_velocity_advection_active = true
 	is_sourcing_active = true
-	is_projection_active = true
+	is_projection_active = trye
 	is_levelset_advection_active = true
 	is_viscosity_active = true
 
