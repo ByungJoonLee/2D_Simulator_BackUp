@@ -312,7 +312,7 @@ public: // Member Functions
 		}
 	}
 
-	inline bool Insdie(const int& i, const int& j) const
+	inline bool Inside(const int& i, const int& j) const
 	{
 		if (i < i_start)
 		{

@@ -22,6 +22,7 @@ public: // Essential data
 public: // Subdata for Multithreading
 	CSR_MATRIX<T> M;
 	VECTOR_ND<T>  y;
+	ARRAY<int>	  start_ix_1D_x, end_ix_1D_x, start_ix_1D_y, end_ix_1D_y;
 
 public: // Constructor and Destructor
 	PCG_METHOD(void)
@@ -173,6 +174,8 @@ public:	// Solver
 			y[i] = (b[i] - sum)*one_over_Mii;
 		}
 
+		//ForwardSubstitution(thread_id, i_res_input, M, y, b);
+
 		T* summation = new T[x.num_dimension];
 
 		for (int i = 0; i < x.num_dimension; i++)
@@ -296,10 +299,12 @@ public:	// Solver
 		BEGIN_HEAD_THREAD_WORK
 		{
 			multithreading->SplitDomainIndex1D(0, A.N);
+			SplitDomainIndex1DinYDirection(0, j_res_input);
+			SplitDomainIndex1DinXDirection(0, i_res_input);
 		}
 		END_HEAD_THREAD_WORK
 	
-		const int N(x.num_dimension), start_ix(multithreading->start_ix_1D[thread_id]), end_ix(multithreading->end_ix_1D[thread_id]);
+		const int N(x.num_dimension), start_ix(multithreading->start_ix_1D[thread_id]), end_ix(multithreading->end_ix_1D[thread_id]), num_of_red_block(2*multithreading->num_threads), num_of_black_block(2*multithreading->num_threads);
 
 		BEGIN_HEAD_THREAD_WORK
 		{
@@ -337,16 +342,20 @@ public:	// Solver
 
 		A.ComputeResidual(x, b, res, thread_id);
 
+		/*BEGIN_HEAD_THREAD_WORK
+		{
+			IncompleteCholeskyDecomposition(i_res_input, j_res_input, A, M);
+		}
+		END_HEAD_THREAD_WORK;*/
+
 		//IncompleteCholeskyDecomposition(multithreading, i_res_input, j_res_input, k_res_input, A, M);
 
-		//MultiplicationByMinverse(thread_id, M, p, res);
+		//MultiplicationByMinverse(i_res_input, j_res_input, M, p, res, thread_id);
 
 		MultiplicationByMinverseAsDiagonal(A, p, res, thread_id);
 
 		DotProduct(res, p, res_new, multithreading, thread_id);
 		
-		
-
 		while (num_iteration < max_iteration)
 		{
 			A.Multiply(p, Ap, thread_id);
@@ -367,7 +376,7 @@ public:	// Solver
 			}
 			multithreading->Sync(thread_id);
 
-			//MultiplicationByMinverse(thread_id, M, p, res);
+			//MultiplicationByMinverse(i_res_input, j_res_input, M, p, res, thread_id);
 			MultiplicationByMinverseAsDiagonal(A, s, res, thread_id);
 
 			res_old = res_new;
@@ -402,5 +411,357 @@ public:	// Solver
 			cout << "Residual: " << residual << endl;
 		}
 		END_HEAD_THREAD_WORK;
+	}
+
+	void SplitDomainIndex1DinXDirection(const int& i_start, const int& i_res)
+	{
+		const int num_threads = multithreading->num_threads;
+		const int i_end = i_start + i_res - 1;
+		const int quotient = i_res / num_threads;
+		const int remainder = i_res % num_threads;
+
+		start_ix_1D_x.Initialize(num_threads);
+		end_ix_1D_x.Initialize(num_threads);
+
+		int i_start_p = i_start;
+
+		for(int i = 0; i < num_threads; i++)
+		{
+			int i_depth = i < remainder ? (quotient + 1) : quotient;
+			start_ix_1D_x[i] = i_start_p;
+			end_ix_1D_x[i] = i_start_p + i_depth - 1;
+
+			i_start_p += i_depth;
+		}
+	}
+
+	void SplitDomainIndex1DinYDirection(const int& j_start, const int& j_res)
+	{
+		const int num_threads = multithreading->num_threads;
+		const int j_end = j_start + j_res - 1;
+		const int quotient = j_res / num_threads;
+		const int remainder = j_res % num_threads;
+
+		start_ix_1D_y.Initialize(num_threads);
+		end_ix_1D_y.Initialize(num_threads);
+
+		int j_start_p = j_start;
+
+		for(int i = 0; i < num_threads; i++)
+		{
+			int j_depth = i < remainder ? (quotient + 1) : quotient;
+			start_ix_1D_y[i] = j_start_p;
+			end_ix_1D_y[i] = j_start_p + j_depth - 1;
+
+			j_start_p += j_depth;
+		}
+	}
+
+	int GlobalCoordinateForRedBlockLeftLowerCorner(const int& thread_id, const int& order, const int& direction)
+	{
+		// x-direction
+		if (direction == (int)1)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return start_ix_1D_x[2*order];
+			}
+			else
+			{
+				return start_ix_1D_x[2*order + 1];
+			}
+		}
+		else if (direction == (int)2)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return start_ix_1D_y[2*order];
+			}
+			else
+			{
+				return start_ix_1D_y[2*order + 1];
+			}
+		}
+	}
+
+	int GlobalCoordinateForBlackBlockLeftLowerCorner(const int& thread_id, const int& order, const int& direction)
+	{
+		// x-direction
+		if (direction == (int)1)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return start_ix_1D_x[2*order + 1];
+			}
+			else
+			{
+				return start_ix_1D_x[2*order];
+			}
+		}
+		else if (direction == (int)2)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return start_ix_1D_y[2*order + 1];
+			}
+			else
+			{
+				return start_ix_1D_y[2*order];
+			}
+		}
+	}
+
+	int GlobalCoordinateForRedBlockLeftUpperCorner(const int& thread_id, const int& order, const int& direction)
+	{
+		// x-direction
+		if (direction == (int)1)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return start_ix_1D_x[2*order];
+			}
+			else
+			{
+				return start_ix_1D_x[2*order + 1];
+			}
+		}
+		else if (direction == (int)2)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return end_ix_1D_y[2*order];
+			}
+			else
+			{
+				return end_ix_1D_y[2*order + 1];
+			}
+		}
+	}
+
+	int GlobalCoordinateForRedBlockRightLowerCorner(const int& thread_id, const int& order, const int& direction)
+	{
+		// x-direction
+		if (direction == (int)1)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return end_ix_1D_x[2*order];
+			}
+			else
+			{
+				return end_ix_1D_x[2*order + 1];
+			}
+		}
+		else if (direction == (int)2)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return start_ix_1D_y[2*order];
+			}
+			else
+			{
+				return start_ix_1D_y[2*order + 1];
+			}
+		}
+	}
+
+	int GlobalCoordinateForRedBlockRightUpperCorner(const int& thread_id, const int& order, const int& direction)
+	{
+		// x-direction
+		if (direction == (int)1)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return end_ix_1D_x[2*order];
+			}
+			else
+			{
+				return end_ix_1D_x[2*order + 1];
+			}
+		}
+		else if (direction == (int)2)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return end_ix_1D_y[2*order];
+			}
+			else
+			{
+				return end_ix_1D_y[2*order + 1];
+			}
+		}
+	}
+
+	int GlobalCoordinateForBlackBlockRightUpperCorner(const int& thread_id, const int& order, const int& direction)
+	{
+		// x-direction
+		if (direction == (int)1)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return end_ix_1D_x[2*order + 1];
+			}
+			else
+			{
+				return end_ix_1D_x[2*order];
+			}
+		}
+		else if (direction == (int)2)
+		{
+			if (thread_id % 2 == 0)
+			{
+				return end_ix_1D_y[2*order + 1];
+			}
+			else
+			{
+				return end_ix_1D_y[2*order];
+			}
+		}
+	}
+
+	void ForwardSubstitution(const int& thread_id, const int& i_res_input, const CSR_MATRIX<T>& M, VECTOR_ND<T>& x, const VECTOR_ND<T>& b)
+	{
+		// Note that we assume number of threads must be power of 2
+		const int num_of_red_block(multithreading->num_threads/2), num_of_black_block(multithreading->num_threads/2);
+		int llx, lly, rux, ruy;
+
+		// Red Block
+		for (int i = 0; i < num_of_red_block; i++)
+		{
+			llx = GlobalCoordinateForRedBlockLeftLowerCorner(thread_id, i, 1);
+			lly = GlobalCoordinateForRedBlockLeftLowerCorner(thread_id, i, 2);
+			rux = GlobalCoordinateForRedBlockRightUpperCorner(thread_id, i, 1);
+			ruy = GlobalCoordinateForRedBlockRightUpperCorner(thread_id, i, 2);
+
+			// Domain 1
+			int i_1D;
+			i_1D = lly*i_res_input + llx;
+			
+			T one_over_M_start = 1/M(i_1D, i_1D);
+		
+			y[i_1D] = b[i_1D]*one_over_M_start;
+
+			// Domain 2
+			int number(0), num_2(0);
+			for (int j = i_1D + 1; j <= lly*i_res_input + rux; j++)
+			{
+				T sum(0);
+			
+				for (int k = M.row_ptr[j]; k < (M.row_ptr[j + 1] - 1); k++)
+				{
+					sum += M.values[k]*y[M.column_index[k]];
+				}
+			    
+				T one_over_Mii = 1/M(j, j);
+				y[j] = (b[j] - sum)*one_over_Mii;
+			}
+
+			// Domain 3
+			number = 0, num_2 = 0;
+			for (int j = (lly+1)*i_res_input + llx; j <= lly*i_res_input + rux; j += i_res_input)
+			{
+				T sum(0);
+			
+				for (int k = M.row_ptr[j]; k < (M.row_ptr[j + 1] - 1); k++)
+				{
+					sum += M.values[k]*y[M.column_index[k]];
+				}
+			
+				T one_over_Mii = 1/M(j, j);
+				y[j] = (b[j] - sum)*one_over_Mii;
+			}
+
+			// Domain 4
+			number = 0, num_2 = 0;
+			for (int j = lly + 1; j <= ruy; j++)
+			{
+				for (int k = llx + 1; k <= rux; k++)
+				{
+					T sum(0);
+
+					int t = j*i_res_input + k;
+					
+					for (int ks = M.row_ptr[t]; ks < (M.row_ptr[t + 1] - 1); ks++)
+					{
+						sum += M.values[ks]*y[M.column_index[ks]];
+					}
+
+					T one_over_Mii = 1/M(t, t);
+					y[t] = (b[t] - sum)*one_over_Mii; 
+				}
+			}
+		}
+
+		// Black Block
+		for (int i = 0; i < num_of_black_block; i++)
+		{
+			llx = GlobalCoordinateForBlackBlockLeftLowerCorner(thread_id, i, 1);
+			lly = GlobalCoordinateForBlackBlockLeftLowerCorner(thread_id, i, 2);
+			rux = GlobalCoordinateForBlackBlockRightUpperCorner(thread_id, i, 1);
+			ruy = GlobalCoordinateForBlackBlockRightUpperCorner(thread_id, i, 2);
+
+			// Domain 5
+			int number = 0, num_2 = 0;
+			for (int j = lly; j <= ruy - 1; j++)
+			{
+				for (int k = llx; k <= rux - 1; k++)
+				{
+					T sum(0);
+
+					int t = j*i_res_input + k;
+					
+					for (int ks = M.row_ptr[t]; ks < (M.row_ptr[t + 1] - 1); ks++)
+					{
+						sum += M.values[ks]*y[M.column_index[ks]];
+					}
+
+					T one_over_Mii = 1/M(t, t);
+					y[t] = (b[t] - sum)*one_over_Mii; 
+				}
+			}
+
+			// Domain 6
+			number = 0, num_2 = 0;
+			for (int j = ruy*i_res_input + llx; j <= ruy*i_res_input + rux - 1; j++)
+			{
+				T sum(0);
+			
+				for (int k = M.row_ptr[j]; k < (M.row_ptr[j + 1] - 1); k++)
+				{
+					sum += M.values[k]*y[M.column_index[k]];
+				}
+			
+				T one_over_Mii = 1/M(j, j);
+				y[j] = (b[j] - sum)*one_over_Mii;
+			}
+
+			// Domain 7
+			number = 0, num_2 = 0;
+			for (int j = lly*i_res_input + rux; j <= ruy*i_res_input + rux - i_res_input; j += i_res_input)
+			{
+				T sum(0);
+			
+				for (int k = M.row_ptr[j]; k < (M.row_ptr[j + 1] - 1); k++)
+				{
+					sum += M.values[k]*y[M.column_index[k]];
+				}
+			    
+				T one_over_Mii = 1/M(j, j);
+				y[j] = (b[j] - sum)*one_over_Mii;
+			}
+
+			// Domain 8
+			int ii = ruy*i_res_input + rux;
+			T one_over_M_start = 1/M(ii, ii);
+		
+			T sum(0);
+			for (int k = M.row_ptr[ii]; k < (M.row_ptr[ii + 1] - 1); k++)
+			{
+				sum += M.values[k]*y[M.column_index[k]];
+			}
+			    
+			T one_over_Mii = 1/M(ii, ii);
+			y[ii] = (b[ii] - sum)*one_over_Mii;
+		}
 	}
 };
