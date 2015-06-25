@@ -20,13 +20,26 @@ public: // Essential for script update
 	std::string						script_base_name;
 
 public: // Simulation Properties
-	T								dt, accu_dt;
+	T								frame_rate;
+	T								dt, accu_dt, max_dt;
 	T								CFL;
+	int								num_current_frame;
 	
 public: // Options for Simulation
 	bool							air_water_simulation;
 	bool							oil_water_simulation;
 	bool							vortex_sheet_problem;
+
+	// Option for Air-Water Simulation
+	bool							large_bubble, small_bubble;
+
+	// Option
+	int								last_frame;
+	bool							auto_run;
+	bool							is_polygonize_levelset;
+
+	// Grid stuff
+	T								grid_scale;
 
 public: // Options for Oil Water Simulation
 	bool							is_vertical, is_parallel;
@@ -39,7 +52,7 @@ public: // Multithreading
 
 public: // Constructor and Destructor
 	SIMULATION_WORLD(void)
-		: multithreading(0), air_water_simulation(false), oil_water_simulation(false), is_vertical(false), is_parallel(false)
+		: multithreading(0), air_water_simulation(false), large_bubble(false), small_bubble(false), oil_water_simulation(false), is_vertical(false), is_parallel(false), num_current_frame(0), last_frame((int)1000000), dt((T)0), max_dt((T)0)
 	{}
 
 	~SIMULATION_WORLD(void)
@@ -55,10 +68,14 @@ public: // Initialization Functions
 
 		SCRIPT_READER script_reader(script);
 
+		num_current_frame = 0;
+
 		SCRIPT_BLOCK script_block_for_this = script_reader.FindBlock("SIMULATION_WORLD");
 
 		dt = script_block_for_this.GetFloat("dt", (T)0.01);
+		max_dt = script_block_for_this.GetFloat("max_dt", (T)100);
 		CFL = script_block_for_this.GetFloat("CFL", (T)0);
+		frame_rate = script_block_for_this.GetFloat("frame_rate", (T)24);
 		accu_dt = (T)0;
 
 		// Simulation Options
@@ -75,9 +92,14 @@ public: // Initialization Functions
 		// Multithreading
 		multithreading->Initialize(script_block_for_this.GetInteger("number_of_threads"));
 
+		last_frame = script_block_for_this.GetInteger("last_frame");
+		auto_run = script_block_for_this.GetBoolean("auto_run");
+
 		// Display
 		cout << "---------------SIMULATION WORLD VARIABLES---------------" << endl; 
 		cout << "Dt = " << dt << endl;
+		cout << "CFL: " << CFL << endl;
+		cout << "frame rate: " << frame_rate << endl;
 
 		if (air_water_simulation)
 		{
@@ -115,8 +137,19 @@ public: // Initialization Functions
 		{
 			world_discretization.Initialize(script_block_for_this.FindBlock("WORLD_DISCRETIZATION"));
 		}
-		InitializeDynamicsSolversFromScript(script_reader);
 		
+		// Option for Air-Water
+		if (air_water_simulation)
+		{
+			large_bubble = world_discretization.large_bubble;
+			small_bubble = world_discretization.small_bubble;
+		}
+
+		InitializeDynamicsSolversFromScript(script_reader);
+		InitializeObjectListFromScript(script_reader);
+
+		grid_scale = 1;
+
 		SetCurrentDirectory(app_abs_dir.c_str());
 	}
 
@@ -139,6 +172,40 @@ public: // Initialization Functions
 		{
 			eulerian_solver.vortex_sheet_problem = vortex_sheet_problem;
 			eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM_AIR_WATER"), multithreading);
+		}
+	}
+
+	void InitializeObjectListFromScript(SCRIPT_READER& script_reader)
+	{
+		GRID_STRUCTURE_2D& base_grid = world_discretization.world_grid;
+
+		SCRIPT_BLOCK script_block = script_reader.FindBlock("SIMULATION_WORLD");
+
+		if (air_water_simulation)
+		{
+			LEVELSET_2D& water_levelset = *eulerian_solver.water_levelset;
+			GRID_STRUCTURE_2D& water_grid = water_levelset.grid;
+
+			int i(0), j(0);
+						
+			if (large_bubble)
+			{
+				LOOPS_2D(i, j, water_grid.i_start, water_grid.j_start, water_grid.i_end, water_grid.j_end)
+				{
+					T x_coor = water_grid.x_min + i*water_grid.dx, y_coor = water_grid.y_min + j*water_grid.dy;
+					water_levelset(i, j) = sqrt(POW2(x_coor) + POW2(y_coor + (T)0.5)) - (T)1/(T)3;
+				}
+				water_levelset.FillGhostCellsFromThreaded(&(water_levelset.phi), false);
+			}
+			if (small_bubble)
+			{
+				LOOPS_2D(i, j, water_grid.i_start, water_grid.j_start, water_grid.i_end, water_grid.j_end)
+				{
+					T x_coor = water_grid.x_min + i*water_grid.dx, y_coor = water_grid.y_min + j*water_grid.dy;
+					water_levelset(i, j) = sqrt(POW2(x_coor) + POW2(y_coor + (T)0.005)) - (T)1/(T)300;
+				}
+				water_levelset.FillGhostCellsFromThreaded(&(water_levelset.phi), false);
+			}
 		}
 	}
 
@@ -167,6 +234,12 @@ public: // Initialization Functions
 			cout << "g_f              : " << eulerian_solver.g_f << endl;
 			cout << "s_f              : " << eulerian_solver.s_f << endl;
 			cout << "v_f              : " << eulerian_solver.v_f << endl;
+			
+			if (accu_dt > max_dt)
+			{
+				cout << "Time step reaches at max!:)" << endl;
+				exit(0);
+			}
 		}
 		END_HEAD_THREAD_WORK;
 
@@ -179,6 +252,7 @@ public: // Initialization Functions
 	{
 		eulerian_solver.water_levelset->ComputeCurvaturesThreaded();
 		multithreading->RunThreads(&SIMULATION_WORLD::AdvanceOneFrameThread, this);
+		num_current_frame++;
 	}
 
 	T DetermineTimeStep()

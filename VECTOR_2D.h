@@ -149,6 +149,15 @@ public: // Member Functions
 			y = 0;
 		}
 	}
+
+	inline VECTOR_2D<TT> Normalized() const
+	{
+		VECTOR_2D<TT> normalize_vector(x, y);
+
+		normalize_vector.MakeThisUnit();
+
+		return normalize_vector;
+	}
 };
 
 // Miscellaneous Free Operators and Functions

@@ -41,4 +41,6 @@ enum  POISSON_SOLVER_TYPE                                   {NO_SOLVER, CG, PCG}
 #define END_GRID_ITERATION_SUM(sync_value)					 multithreading->SyncSum(thread_id, sync_value);}
 
 #define END_GRID_ITERATION_MAX_2D(sync_value)				 multithreading->SyncMax(thread_id, sync_value);}
-															
+
+#define BEGIN_1D_ITERATION									 {const int p_start(multithreading->start_ix_1D[thread_id]), p_end(multithreading->end_ix_1D[thread_id]);						\
+															  for(int p = p_start; p <= p_end; p++)

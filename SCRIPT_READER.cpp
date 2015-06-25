@@ -6,20 +6,24 @@ const char* SCRIPT_READER::REGEX_BLOCKDATA_STRING       = "\\s*(\\w+)\\s*\\{\\s*
 const char* SCRIPT_READER::REGEX_ASSIGN_BOOLEAN_STRING  = "\\s*(\\w+)\\s*=\\s*(true|false)\\s*";
 const char* SCRIPT_READER::REGEX_ASSIGN_NUMBER_STRING   = "\\s*(\\w+)\\s*=\\s*(-*\\d*\\.*\\d+)\\s*";
 const char* SCRIPT_READER::REGEX_ASSIGN_VECTOR2_STRING  = "\\s*(\\w+)\\s*=\\s*(\\(\\s*-*\\d*\\.*\\d+\\s*,\\s*-*\\d*\\.*\\d+\\s*\\))\\s*";
+const char* SCRIPT_READER::REGEX_ASSIGN_VECTOR3_STRING  = "\\s*(\\w+)\\s*=\\s*(\\(\\s*-*\\d*\\.*\\d+\\s*,\\s*-*\\d*\\.*\\d+\\s*,\\s*-*\\d*\\.*\\d+\\s*\\))\\s*";
 
 const char* SCRIPT_READER::REGEX_ASSIGN_STRING_STRING   = "\\s*(\\w+)\\s*=\\s*\"(\\s*[\\:\\\\.\\w\\/\\s\\-.*\\m\\d]+\\s*)\"\\s*";
 
 const char* SCRIPT_READER::REGEX_ASSIGN_VECTOR2_VALUE_STRING  = "\\s*\\(\\s*(-*\\d*\\.*\\d+)\\s*,\\s*(-*\\d*\\.*\\d+)\\s*\\)\\s*";
+const char* SCRIPT_READER::REGEX_ASSIGN_VECTOR3_VALUE_STRING  = "\\s*\\(\\s*(-*\\d*\\.*\\d+)\\s*,\\s*(-*\\d*\\.*\\d+)\\s*,\\s*(-*\\d*\\.*\\d+)\\s*\\)\\s*";
 
 const boost::regex SCRIPT_READER::REGEX_VALUE_NAME     = boost::regex("\\s*(\\w+)\\s*");
 const boost::regex SCRIPT_READER::REGEX_INCLUDE        = boost::regex(REGEX_INCLUDE_STRING);
 const boost::regex SCRIPT_READER::REGEX_BLOCKDATA      = boost::regex(REGEX_BLOCKDATA_STRING);
 const boost::regex SCRIPT_READER::REGEX_ASSIGN_NUMBER  = boost::regex(REGEX_ASSIGN_NUMBER_STRING );
 const boost::regex SCRIPT_READER::REGEX_ASSIGN_VECTOR2 = boost::regex(REGEX_ASSIGN_VECTOR2_STRING);
+const boost::regex SCRIPT_READER::REGEX_ASSIGN_VECTOR3 = boost::regex(REGEX_ASSIGN_VECTOR3_STRING);
 const boost::regex SCRIPT_READER::REGEX_ASSIGN_BOOLEAN = boost::regex(REGEX_ASSIGN_BOOLEAN_STRING);
 const boost::regex SCRIPT_READER::REGEX_ASSIGN_STRING  = boost::regex(REGEX_ASSIGN_STRING_STRING);
 
 const boost::regex SCRIPT_READER::REGEX_ASSIGN_VECTOR2_VALUE = boost::regex(REGEX_ASSIGN_VECTOR2_VALUE_STRING);
+const boost::regex SCRIPT_READER::REGEX_ASSIGN_VECTOR3_VALUE = boost::regex(REGEX_ASSIGN_VECTOR3_VALUE_STRING);
 
 const SCRIPT_BLOCK* SCRIPT_READER::empty_block = new SCRIPT_BLOCK;
 const SCRIPT_VALUE* SCRIPT_READER::empty_value = new SCRIPT_VALUE;
@@ -861,7 +865,25 @@ VT SCRIPT_BLOCK::GetVector2(const char* value_name, const VT& default_value) con
 	return val;
 }
 
+VECTOR_3D<T> SCRIPT_BLOCK::GetVector3(const char* value_name, const VECTOR_3D<T>& default_value) const
+{
+	const SCRIPT_VALUE* data = SearchValue(&values, value_name);
+	if (!data)
+	{
+		return default_value;
+	}
 
+	boost::cmatch matches;
+	boost::regex_match(data->val.data(), matches, SCRIPT_READER::REGEX_ASSIGN_VECTOR3_VALUE);
+
+	VECTOR_3D<T> val;
+		
+	val.x = (T)atof(string(matches[1].first, matches[1].second).data());
+	val.y = (T)atof(string(matches[2].first, matches[2].second).data());
+	val.z = (T)atof(string(matches[3].first, matches[3].second).data());
+
+	return val;
+}
 
 VI SCRIPT_BLOCK::GetInt2(const char* value_name, const VI& default_value) const
 {

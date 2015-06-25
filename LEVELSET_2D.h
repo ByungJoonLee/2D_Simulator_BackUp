@@ -3,8 +3,11 @@
 #include "COMMON_DEFINITION.h"
 #include "FIELD_STRUCTURE_2D.h"
 #include "DYNAMIC_ARRAY.h"
+#include "LEVELSET_OBJECT.h"
 
-class LEVELSET_2D
+class LEVELSET_2D;
+
+class LEVELSET_2D : public LEVELSET_OBJECT
 {
 public: // Essential Data
 	FIELD_STRUCTURE_2D<T>			signed_distance_field;
@@ -205,6 +208,11 @@ public: // Member Functions
 		return BiLinearInterpolation(position);
 	}
 
+	inline const T SignedDistance(const int& i, const int& j) const
+	{
+		return signed_distance_field(i, j);
+	}
+	
 	void AssignAllValuesLevelset(const T& value)
 	{
 		for (int j = grid.j_start; j <= grid.j_end; j++)
@@ -232,9 +240,24 @@ public: // Member Functions
 		signed_distance_field.FillGhostCellsFrom(phi_real, copy_real_data);
 	}
 
+	void FillGhostCellsFrom(const int& thread_id, ARRAY_2D<T>& phi_real, const bool& copy_real_data)
+	{
+		signed_distance_field.FillGhostCellsFrom(phi_real, copy_real_data, thread_id);
+	}
+
 	void FillGhostCellsFromPointer(ARRAY_2D<T>* phi_real, const bool& copy_real_data)
 	{
 		signed_distance_field.FillGhostCellsFrom(*phi_real, copy_real_data);
+	}
+	
+	void FillGhostCellsFromPointerThreaded(const int& thread_id, ARRAY_2D<T>* phi_real, const bool& copy_real_data)
+	{
+		signed_distance_field.FillGhostCellsFrom(thread_id, *phi_real, copy_real_data);
+	}
+
+	void FillGhostCellsFromThreaded(ARRAY_2D<T>* phi_real, const bool& copy_real_data)
+	{
+		multithreading->RunThreads(&LEVELSET_2D::FillGhostCellsFromPointerThreaded, this, phi_real, copy_real_data);
 	}
 
 	void FillGhostCellsContinuousDerivativesFrom(ARRAY_2D<T>& phi_real, const bool& copy_real_data)
@@ -925,7 +948,12 @@ public: // Member Functions
 		normal_output = normal.BilinearInterpolation(position);
 		normal_output.MakeThisUnit();
 	}
-
+	
+	inline const VT UnitNormal(const VT& position) const
+	{
+		return (normal.BilinearInterpolation(position)).Normalized();
+	}
+	
 	inline T Curvature(const VT& position) const
 	{
 		return curvature.BilinearInterpolation(position); 

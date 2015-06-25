@@ -430,6 +430,83 @@ public: // Functions filling the ghost cell
 		multithreading->Sync(thread_id);
 	}
 
+	void FillGhostCellsFrom(const int& thread_id, ARRAY_2D<TT>& phi_real, const bool& copy_real_data)
+	{
+		// Fill real region
+		if (copy_real_data)
+		{
+			const int i_start(partial_grids[thread_id].i_start), j_start(partial_grids[thread_id].j_start), i_end(partial_grids[thread_id].i_end), j_end(partial_grids[thread_id].j_end);
+
+			for (int j = j_start; j <= j_end; j++)
+			{
+				for (int i = i_start; i <= i_end; i++)
+				{
+					array_for_this(i, j) = phi_real(i, j);
+				}
+			}
+		}
+
+		if (ghost_width == 0)
+		{
+			multithreading->Sync(thread_id);
+			return;
+		}
+
+		// Fill Ghost Region
+		const int i_start(grid.i_start), j_start(grid.j_start), i_end(grid.i_end), j_end(grid.j_end);
+		const int num_threads(partial_grids.length);
+		
+		// Face left
+		if (0 % num_threads == thread_id)
+		{
+			for (int j = j_start; j <= j_end; j++)
+			{
+				for (int i = i_start - ghost_width; i <= i_start - 1; i++)
+				{
+					array_for_this(i, j) = phi_real(i_start + 1, j);
+				}
+			}
+		}
+		
+		// Face right
+		if (1 % num_threads == thread_id)
+		{
+			for (int j = j_start; j <= j_end; j++)
+			{
+				for (int i = i_end + 1; i <= i_end + ghost_width; i++)
+				{
+					array_for_this(i, j) = phi_real(i_end - 1 , j);
+				}
+			}
+		}
+		
+		// Face top
+		if (2 % num_threads == thread_id)
+		{
+			for (int i = i_start; i <= i_end; i++)
+			{
+				for (int j = j_end + 1; j <= j_end + ghost_width; j++)
+				{
+					array_for_this(i, j) = phi_real(i, j_end - 1);
+				}
+			}
+		}
+		
+		// Face bottom
+		if (3 % num_threads == thread_id)
+		{
+			for (int i = i_start; i <= i_end; i++)
+			{
+				for (int j = j_start - ghost_width; j <= j_start - 1; j++)
+				{
+					array_for_this(i, j) = phi_real(i, j_start + 1);
+				}
+			}
+		}
+
+		multithreading->Sync(thread_id);
+	}
+
 	void FillGhostCellsFrom(ARRAY_2D<TT>& phi_real, const bool& copy_real_data)
 	{
 		// Fill real region

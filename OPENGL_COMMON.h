@@ -1,5 +1,6 @@
 #pragma once
 
+#include "COMMON_DEFINITION.h"
 #include <GL/glew.h>
 #include <GL/glut.h>
 #include <string>
@@ -75,6 +76,111 @@ public: // Member Functions
 		a = a_input;
 	}
 };
+
+//////////////////////////////////////////////////////////////////////// 
+//						     OPENGL_VEC2							 //
+///////////////////////////////////////////////////////////////////////
+class OPENGL_VEC2
+{
+public: // Essential Data
+	GLfloat x;
+	GLfloat y;
+
+public: // Constructors and Destructor
+	OPENGL_VEC2(void)
+		: x(0.0f), y(0.0f)
+	{}
+
+	OPENGL_VEC2(GLfloat x_input, GLfloat y_input)
+		: x(x_input), y(y_input)
+	{}
+
+public: // Operator Overloading
+	OPENGL_VEC2& operator+=(const OPENGL_VEC2& p)
+	{
+		x += p.x;
+		y += p.y;
+		return *this;
+	}
+
+	OPENGL_VEC2& operator-=(const OPENGL_VEC2& p) 
+	{
+		x -= p.x;
+		y -= p.y;
+		return *this;
+	}
+
+	OPENGL_VEC2& operator*=(GLfloat c)
+	{
+		x = x*c;
+		y = y*c;
+		return *this;
+	}
+
+	OPENGL_VEC2& operator/=(GLfloat c)
+	{
+		x = x/c;
+		y = y/c;
+		return *this;
+	}
+
+public: // Member Functions
+	GLfloat GetX(void) const
+	{
+		return x;
+	}
+
+	GLfloat GetY(void) const
+	{
+		return y;
+	}
+
+	void SetX(GLfloat x_input)
+	{
+		x = x_input;
+	}
+
+	void SetY(GLfloat y_input)
+	{
+		y = y_input;
+	}
+
+	void Set(GLfloat x_input, GLfloat y_input)
+	{
+		x = x_input;
+		y = y_input;
+	}
+};
+
+inline const OPENGL_VEC2 operator+(const OPENGL_VEC2& p1, const OPENGL_VEC2& p2)
+{
+	return OPENGL_VEC2(p1.x + p2.x, p1.y + p2.y);
+}
+
+inline const OPENGL_VEC2 operator-(const OPENGL_VEC2& p1, const OPENGL_VEC2& p2)
+{
+	return OPENGL_VEC2(p1.x - p2.x, p1.y - p2.y);
+}
+
+inline const OPENGL_VEC2 operator*(const OPENGL_VEC2& p, GLfloat c)
+{
+	return OPENGL_VEC2(p.x * c, p.y * c);
+}
+
+inline const OPENGL_VEC2 operator*(GLfloat c, const OPENGL_VEC2& p)
+{
+	return OPENGL_VEC2(p.x * c, p.y * c);
+}
+
+inline const OPENGL_VEC2 operator-(const OPENGL_VEC2& p)
+{
+	return OPENGL_VEC2(-p.x, -p.y);
+}
+
+inline const OPENGL_VEC2 operator/(const OPENGL_VEC2& p, GLfloat c)
+{
+	return OPENGL_VEC2(p.x/c, p.y/c);
+}
 
 //////////////////////////////////////////////////////////////////////// 
 //						     OPENGL_VEC3							 //
@@ -473,12 +579,12 @@ public: // Member Functions
 
 	OPENGL_SIZE ExpandedTo(const OPENGL_SIZE& othersize) const
 	{
-		return OPENGL_SIZE(std::max(wd, othersize.wd), std::max(ht, othersize.ht));
+		return OPENGL_SIZE(MAX(wd, othersize.wd), MAX(ht, othersize.ht));
 	}
 
 	OPENGL_SIZE BoundedTo(const OPENGL_SIZE& othersize) const
 	{
-		return OPENGL_SIZE(std::min(wd, othersize.wd), std::min(ht, othersize.ht));
+		return OPENGL_SIZE(MIN(wd, othersize.wd), MIN(ht, othersize.ht));
 	}
 
 	int& RWidth()

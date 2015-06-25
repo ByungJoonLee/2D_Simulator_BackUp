@@ -15,10 +15,10 @@ public: // Essential Data
 
 public: // Constructor and Destructor
 	PROJECT_INFO(void)
-	{}
+	{};
 
 	PROJECT_INFO(const PROJECT_INFO& other)
-	{}
+	{};
 
 public: // Member Functions
 	static std::string GetAppDir()
@@ -46,11 +46,8 @@ public: // Member Functions
 		return script_basename;
 	}
 
-	static std::string GetScriptFilename()
+	static std::string GetScriptFileName()
 	{
 		return script_filename;
 	}
 };
-
-
-		

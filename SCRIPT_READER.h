@@ -2,6 +2,7 @@
 
 #include "COMMON_DEFINITION.h"
 #include "VECTOR_ND.h"
+#include "VECTOR_3D.h"
 
 #include <stdio.h>
 #include <iostream>
@@ -40,8 +41,10 @@ public: // Essential Data
 	static const char*			REGEX_BLOCKDATA_STRING;
 	static const char*			REGEX_ASSIGN_NUMBER_STRING;
 	static const char*			REGEX_ASSIGN_VECTOR2_STRING;
+	static const char*			REGEX_ASSIGN_VECTOR3_STRING;
 	static const char*			REGEX_ASSIGN_BOOLEAN_STRING;
 	static const char*			REGEX_ASSIGN_VECTOR2_VALUE_STRING;
+	static const char*			REGEX_ASSIGN_VECTOR3_VALUE_STRING;
 	static const char*			REGEX_ASSIGN_STRING_STRING;
 	static const char*			REGEX_ASSIGN_FLAGS_STRING;
 	static const char*			REGEX_FINDBLOCK_STRING;
@@ -52,9 +55,11 @@ public: // Essential Data
 	static const boost::regex	REGEX_VALUE_NAME;
 	static const boost::regex	REGEX_ASSIGN_NUMBER;
 	static const boost::regex	REGEX_ASSIGN_VECTOR2;
+	static const boost::regex	REGEX_ASSIGN_VECTOR3;
 	static const boost::regex	REGEX_ASSIGN_BOOLEAN;
 	static const boost::regex	REGEX_ASSIGN_STRING;
 	static const boost::regex	REGEX_ASSIGN_VECTOR2_VALUE;
+	static const boost::regex	REGEX_ASSIGN_VECTOR3_VALUE;
 	static const boost::regex   REGEX_ASSIGN_FLAGS;
 
 	static const SCRIPT_BLOCK*	empty_block;
@@ -153,12 +158,13 @@ public: // Member Functions
 	
 	vector<SCRIPT_BLOCK*> GetBlockList(const char* block_name);
 	
-	int				GetInteger(const char* value_name, const int& default_value = 0							) const;
-	T				GetFloat(const char* value_name, const T& default_value = (T)0							) const;
-	VT				GetVector2(const char* value_name, const VT& default_value = VT()						) const;
-	VI				GetInt2(const char* value_name, const VI& default_value = VI()							) const;
-	bool			GetBoolean(const char* value_name, const bool default_value = false						) const;
-	const char*		GetString(const char* value_name, const char* default_value = "Null"					) const;
+	int				GetInteger(const char* value_name, const int& default_value = 0							   ) const;
+	T				GetFloat(const char* value_name, const T& default_value = (T)0							   ) const;
+	VT				GetVector2(const char* value_name, const VT& default_value = VT()						   ) const;
+	VECTOR_3D<T>	GetVector3(const char* value_name, const VECTOR_3D<T>& default_value = VECTOR_3D<T>()      ) const;
+	VI				GetInt2(const char* value_name, const VI& default_value = VI()							   ) const;
+	bool			GetBoolean(const char* value_name, const bool default_value = false						   ) const;
+	const char*		GetString(const char* value_name, const char* default_value = "Null"					   ) const;
 	
 	int GetValue(const char* value_name, const int& default_value = 0) const
 	{
@@ -173,6 +179,11 @@ public: // Member Functions
 	VT GetValue(const char* value_name, const VT& default_value = VT()) const
 	{
 		return GetVector2(value_name, default_value);
+	}
+
+	VECTOR_3D<T> GetValue(const char* value_name, const VECTOR_3D<T>& default_value = VECTOR_3D<T>()) const
+	{
+		return GetVector3(value_name, default_value);
 	}
 
 	VI GetValue(const char* value_name, const VI& default_value = VI()) const
