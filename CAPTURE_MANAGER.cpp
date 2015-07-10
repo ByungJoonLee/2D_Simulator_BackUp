@@ -206,7 +206,7 @@ void CAPTURE_MANAGER::MakeVideo()
 	video_encoding_command.append("_%04d.png\" -r 30 -g 1 -qscale 1 \"");	
 	video_encoding_command.append(output_video_path_);		
 	video_encoding_command.append(video_file_basename); 
-	video_encoding_command.append(".avi\"");		
+	video_encoding_command.append(".avi\"");
 	file_utilities.Execute_Process(video_encoding_command);		
 
 	std::cout<<"-end of video encoding"<<std::endl;// debug
