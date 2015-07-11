@@ -30,7 +30,6 @@ public: // Constructor and Destructor
 		RegisterDrawType((int) OPENGL_LEVELSET::LEVELSET_DRAW_WIRE, "WIRE");
 		RegisterDrawType((int) OPENGL_LEVELSET::LEVELSET_DRAW_WIRE_SOLID, "WIRE_SOLID");
 		SetDrawType((int) LEVELSET_DRAW_WIRE);
-		is_levelset = true;
 	}
 
 	~OPENGL_LEVELSET(void)

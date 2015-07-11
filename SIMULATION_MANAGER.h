@@ -155,40 +155,17 @@ public: // Initialization Function
 	{
 		if (opengl)
 		{
-			if (simulation->fluid_solver)
-			{
-				ostringstream string_stream;
-				int hour, minute;
-				string_stream << fixed << setprecision(3);
-				hour = (int)total_time.count()/3600;
-				minute = ((int)total_time.count()/60)%60;
-				string_stream << "acc_dt: " << GetSimulationAccumulatedTime() << "s\n";
-				string_stream << "sim_dt: " << simulation_time.count() << "s\n";
-				string_stream << "tot_dt: " << hour << "h " << minute << "m ";
+			ostringstream string_stream;
+			int hour, minute;
+			string_stream << fixed << setprecision(3);
+			hour = (int)total_time.count()/3600;
+			minute = ((int)total_time.count()/60)%60;
+			string_stream << "acc_dt: " << GetSimulationAccumulatedTime() << "s\n";
+			string_stream << "sim_dt: " << simulation_time.count() << "s\n";
+			string_stream << "tot_dt: " << hour << "h " << minute << "m ";
 
-				string str = string_stream.str();
-				opengl->SetInfoText(str); 
-			}
-			else if (simulation->numerical_test_solver)
-			{
-				if (simulation->numerical_integration_test)
-				{
-					ostringstream string_stream;
-					string_stream << fixed << setprecision(6);
-					string_stream << "sim_dt: " << simulation_time.count() << "s\n";
-					string_stream << "rel_er: " << simulation->numerical_integration.relative_error << endl;
-					string str = string_stream.str();
-					opengl->SetInfoText(str); 
-				}
-				if (simulation->poisson_equation_with_jump_condition)
-				{
-					ostringstream string_stream;
-					string_stream << fixed << setprecision(6);
-					string_stream << "sim_dt: " << simulation_time.count() << "s\n";
-					string str = string_stream.str();
-					opengl->SetInfoText(str); 
-				}
-			}
+			string str = string_stream.str();
+			opengl->SetInfoText(str);
 		}
 	}
 
@@ -198,27 +175,8 @@ public: // Initialization Function
 
 		if (simulation)
 		{
-			if (simulation->fluid_solver)
-			{
-				simulation->AdvanceOneFrame();
-			}
-			if (simulation->numerical_test_solver)
-			{
-				if (simulation->numerical_integration_test)
-				{
-					simulation->CalculateIntegralValue();
-				}
-				if (simulation->poisson_equation_with_jump_condition)
-				{
-					simulation->DeterminePoissonSolution();
-				}
-				if (simulation->signal_processing_test)
-				{
-					simulation->EstimateSignal();
-				}
-			}
+			simulation->AdvanceOneFrame();
 		}
-
 		simulation_time = boost::chrono::system_clock::now() - start_time;
 		total_time += simulation_time;
 		
@@ -227,6 +185,8 @@ public: // Initialization Function
 			opengl->Update();
 		}
 	}
+
+	
 
 	void Render()
 	{

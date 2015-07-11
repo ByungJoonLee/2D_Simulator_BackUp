@@ -1,6 +1,6 @@
 #pragma once
 
-#include "POISSON_SOLVER.h"
+#include "POISSON_SOLVER_2D.h"
 #include "LEVELSET_2D.h"
 
 class VISCOSITY_2D
@@ -42,7 +42,7 @@ public: // Sub Solver - For the semi-implicit method
 	bool						semi_implicit_approach;
 
 	enum POISSON_SOLVER_TYPE	poisson_solver_type;
-	POISSON_SOLVER				poisson_solver;
+	POISSON_SOLVER_2D			poisson_solver;
 
 	FIELD_STRUCTURE_2D<int>		boundary_condition_field_x;
 	FIELD_STRUCTURE_2D<int>		boundary_condition_field_y;

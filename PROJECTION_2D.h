@@ -1,7 +1,7 @@
 #pragma once
 
 #include "LEVELSET_2D.h"
-#include "POISSON_SOLVER.h"
+#include "POISSON_SOLVER_2D.h"
 
 enum PROJECTION_TYPE						{FREE_SURFACE_WATER, AIR, MULTIPHASE};
 
@@ -37,7 +37,7 @@ public: // Control Options
 	enum PROJECTION_TYPE            projection_type;
 
 public: // Subsolver
-	POISSON_SOLVER					poisson_solver;
+	POISSON_SOLVER_2D				poisson_solver;
 
 public: // Convenient variables and references
 	GRID_STRUCTURE_2D&				base_grid;
@@ -524,6 +524,7 @@ public: // Solver
 		}
 	}
 
+	
 	void DeterminePressure(const int& thread_id)
 	{
 		SetupBoundaryCondition(pressure_field, boundary_condition_field, water_levelset, thread_id);
@@ -765,7 +766,7 @@ public: // Members Functions
 				{
 					bc_array(i, j) = BC_NEUM;
 					//pressure_input(i, j) = (T)0;
-					if (i < grid.i_start)
+					/*if (i < grid.i_start)
 					{
 						pressure_input(i, j) = pressure_input(grid.i_start, j);
 					}
@@ -780,7 +781,7 @@ public: // Members Functions
 					if (j > grid.j_end)
 					{
 						pressure_input(i, j) = pressure_input(i, grid.j_end);
-					}
+					}*/
 				}
 				else
 				{

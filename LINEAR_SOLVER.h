@@ -1,6 +1,5 @@
 #pragma once
 
-#include "FIELD_STRUCTURE_1D.h"
 #include "FIELD_STRUCTURE_2D.h"
 #include "CSR_MATRIX.h"
 
@@ -31,18 +30,6 @@ public: // Initialization Function
 	}
 
 public: // Member Functions
-	virtual void Solve(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const FIELD_STRUCTURE_1D<int>& bc, const int& thread_id)
-	{
-		cout << "virtual LINEAR_SOLVER::Solve" << endl;
-		exit(1);
-	}
-
-	virtual void Solve(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const FIELD_STRUCTURE_1D<int>& bc)
-	{
-		cout << "virtual LINEAR_SOLVER::Solve" << endl;
-		exit(1);
-	}
-
 	virtual void Solve(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const FIELD_STRUCTURE_2D<int>& bc, const int& thread_id)
 	{
 		cout << "virtual LINEAR_SOLVER::Solve" << endl;

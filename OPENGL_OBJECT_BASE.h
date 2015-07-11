@@ -15,10 +15,10 @@ public: // Essential Data
 	bool				is_visible;
 
 	OPENGL_ROT4			rotation;
-	OPENGL_VEC3			position;
-	OPENGL_VEC3			scale;
-	OPENGL_VEC3			length;
-	OPENGL_VEC3			center;
+	OPENGL_VEC2			position;
+	OPENGL_VEC2			scale;
+	OPENGL_VEC2			length;
+	OPENGL_VEC2			center;
 
 	OPENGL_MATERIAL		material;
 
@@ -30,16 +30,9 @@ public: // Essential Data
 
 	static int			count_object_for_name;
 
-	 // Option for Drawing
-	bool				is_levelset;
-	bool				is_velocity;
-	bool				is_velocity_x;
-	bool				is_velocity_y;
-	bool				is_scalar;
-
 public: // Constructor and Destructor
 	OPENGL_OBJECT_BASE(const char* display_name, OPENGL_DRIVER* driver_input)
-		: id(GenerateID()), name(display_name), draw_type(0), position(0.0, 0.0, 0.0), rotation(0.0, 0.0, 0.0, 0.0), scale(1.0, 1.0, 1.0), driver(driver_input), is_levelset(false), is_velocity(false), is_scalar(false)
+		: id(GenerateID()), name(display_name), draw_type(0), position(0.0, 0.0), rotation(0.0, 0.0, 0.0, 0.0), scale(1.0, 1.0), driver(driver_input)
 	{}
 
 	~OPENGL_OBJECT_BASE(void)
@@ -90,8 +83,8 @@ public: // Member Functions
 	{
 		glMatrixMode(GL_MODELVIEW);
 		glPushMatrix();
-			glScalef(scale.GetX(), scale.GetY(), scale.GetZ());
-			glTranslatef(position.GetX(), position.GetY(), position.GetZ());
+			glScalef(scale.GetX(), scale.GetY(), 0.0f);
+			glTranslatef(position.GetX(), position.GetY(), 0.0f);
 	}
 
 	void PostDraw()
@@ -118,17 +111,17 @@ public: // Member Functions
 		return name;
 	}
 
-	void SetPosition(const OPENGL_VEC3& position_input)
+	void SetPosition(const OPENGL_VEC2& position_input)
 	{
 		position = position_input;
 	}
 
-	void SetPosition(GLfloat x, GLfloat y, GLfloat z)
+	void SetPosition(GLfloat x, GLfloat y)
 	{
-		position = OPENGL_VEC3(x, y, z);
+		position = OPENGL_VEC2(x, y);
 	}
 	
-	const OPENGL_VEC3& GetPosition() const
+	const OPENGL_VEC2& GetPosition() const
 	{
 		return position;
 	}
@@ -148,47 +141,47 @@ public: // Member Functions
 		return rotation;
 	}
 
-	void SetScale(const OPENGL_VEC3& scale_input)
+	void SetScale(const OPENGL_VEC2& scale_input)
 	{
 		scale = scale_input;
 	}
 
-	void SetScale(GLfloat x, GLfloat y, GLfloat z) 
+	void SetScale(GLfloat x, GLfloat y) 
 	{
-		scale = OPENGL_VEC3(x, y, z);
+		scale = OPENGL_VEC2(x, y);
 	}
 
-	const OPENGL_VEC3& GetScale() const
+	const OPENGL_VEC2& GetScale() const
 	{
 		return scale;
 	}
 	
-	void SetLength(const OPENGL_VEC3& length_input)
+	void SetLength(const OPENGL_VEC2& length_input)
 	{
 		length = length_input;
 	}
 
-	void SetLength(GLfloat x, GLfloat y, GLfloat z)
+	void SetLength(GLfloat x, GLfloat y)
 	{
-		length = OPENGL_VEC3(x, y, z);
+		length = OPENGL_VEC2(x, y);
 	}
 
-	const OPENGL_VEC3& GetLength() const
+	const OPENGL_VEC2& GetLength() const
 	{
 		return length;
 	}
 
-	void SetCenter(const OPENGL_VEC3& center_input)
+	void SetCenter(const OPENGL_VEC2& center_input)
 	{
 		center = center_input;
 	}
 
-	void SetCenter(GLfloat x, GLfloat y, GLfloat z)
+	void SetCenter(GLfloat x, GLfloat y)
 	{
-		center = OPENGL_VEC3(x, y, z);
+		center = OPENGL_VEC2(x, y);
 	}
 
-	const OPENGL_VEC3& GetCenter() const
+	const OPENGL_VEC2& GetCenter() const
 	{
 		return center;
 	}

@@ -64,7 +64,6 @@ public: // Viscosity and Surface Tension, Density Field - Set 1 as inside and 2 
 	T								water_viscosity, air_viscosity, oil_viscosity;
 	T								epsilon_for_mollification;
 	T								water_density, air_density, oil_density;
-	T								beta_p, beta_m;
 	VT								gravity;
 	T								surface_tension;
 	FIELD_STRUCTURE_2D<T>			viscosity_field;
@@ -1512,7 +1511,6 @@ public: // Advancing
 		{
 			Projection(dt, thread_id);
 		}
-		
 	}
 
 public: // Simulation Steps

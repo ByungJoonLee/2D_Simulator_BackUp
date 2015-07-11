@@ -5,7 +5,6 @@
 #include "SIMULATION_WORLD.h"
 #include "OPENGL_EULERIAN_FLUID_SOLVER.h"
 #include "OPENGL_LEVELSET.h"
-#include "OPENGL_SCALARFIELD.h"
 #include "OPENGL_2D_TEXT.h"
 #include <list>
 #include <vector>
@@ -63,9 +62,6 @@ public: // Essential Data
 	vector<OPENGL_SOLVER_BASE*>		all_solvers;
 
 	OPENGL_EULERIAN_FLUID_SOLVER*	opengl_fluid_solver;
-	OPENGL_LEVELSET*				opengl_levelset_for_numerical_integration;
-	OPENGL_LEVELSET*				opengl_levelset_for_poisson_equation_test;
-	OPENGL_SCALARFIELD*				opengl_solution_for_poisson_equation_test;
 
 	OPENGL_LIGHT_MANAGER*			light_manager;
 	OPENGL_SIMULATION_BOX*			gl_simulation_box;
@@ -87,7 +83,6 @@ public: // Essential Data
 	string							script_abs_dir;
 	bool							light_draw_for_debug;
 
-	bool							draw_grid;
 	bool							draw_axis;
 	bool							draw_corner_axis;
 	bool							draw_simulation_box;
@@ -96,13 +91,11 @@ public: // Essential Data
 
 	bool							draw_levelset;
 	bool							draw_velocity;
-	bool							draw_scalar;
+	bool							draw_pressure;
 	bool							draw_boundary;
 
 	bool							draw_velocity_x;
 	bool							draw_velocity_y;
-
-	bool							draw_for_debug;
 
 	// For report
 	int								min_num_water_triangles;
@@ -133,18 +126,16 @@ public: // Constructor and Destructor
 		, script_abs_dir(string())
 		, light_draw_for_debug(false)
 		, draw_simulation_box(true)
-		, draw_grid(false)
 		, draw_axis(false)
 		, draw_corner_axis(true)
 		, draw_ground(true)
 		, draw_info(true)
 		, draw_levelset(true)
-		, draw_scalar(false)
+		, draw_pressure(false)
 		, draw_velocity(false)
 		, draw_boundary(true)
 		, draw_velocity_x(false)
 		, draw_velocity_y(false)
-		, draw_for_debug(false)
 		, opengl_fluid_solver(0)
 		, min_num_water_triangles(0)
 		, max_num_water_triangles(0)
@@ -204,32 +195,14 @@ public: // Initialization Function
 		DeleteAllObjects();
 
 		// Create 
-		if (simulation_world->fluid_solver)
+		opengl_fluid_solver = new OPENGL_EULERIAN_FLUID_SOLVER(driver, &(simulation_world->eulerian_solver), multithreading, grid_scale);
+		all_solvers.push_back(opengl_fluid_solver);
+
+		for (vector<OPENGL_SOLVER_BASE*>::iterator it = all_solvers.begin(); it != all_solvers.end(); ++it)
 		{
-			opengl_fluid_solver = new OPENGL_EULERIAN_FLUID_SOLVER(driver, &(simulation_world->eulerian_solver), multithreading, grid_scale);
-			all_solvers.push_back(opengl_fluid_solver);
-			
-			for (vector<OPENGL_SOLVER_BASE*>::iterator it = all_solvers.begin(); it != all_solvers.end(); ++it)
-			{
-				all_objects.insert(all_objects.end(), (*it)->GetObjects().begin(), (*it)->GetObjects().end());
-			}
+			all_objects.insert(all_objects.end(), (*it)->GetObjects().begin(), (*it)->GetObjects().end());
 		}
-		else if (simulation_world->numerical_test_solver)
-		{
-			if (simulation_world->numerical_integration_test)
-			{
-				opengl_levelset_for_numerical_integration = new OPENGL_LEVELSET("NUMERICAL_INTEGRATION_LEVELSET", driver, simulation_world->numerical_integration.object_levelset, multithreading, grid_scale);
-				all_objects.push_back(opengl_levelset_for_numerical_integration);
-			}
-			if (simulation_world->poisson_equation_with_jump_condition)
-			{
-				opengl_levelset_for_poisson_equation_test = new OPENGL_LEVELSET("POISSON_INTERFACE_LEVELSET", driver, simulation_world->poisson_equation_test.interface_levelset_2d, multithreading, grid_scale);
-				all_objects.push_back(opengl_levelset_for_poisson_equation_test);
-				opengl_solution_for_poisson_equation_test = new OPENGL_SCALARFIELD("POISSON_SOLUTION_FIELD", driver, &simulation_world->poisson_equation_test.solution_2d);
-				all_objects.push_back(opengl_solution_for_poisson_equation_test);
-			}
-		}		
-		
+
 		// Simulation grid min/max
 		GRID_STRUCTURE_2D& base_grid = simulation_world->world_discretization.world_grid;
 		
@@ -240,12 +213,12 @@ public: // Initialization Function
 
 		for (vector<OPENGL_OBJECT_BASE*>::iterator it = all_objects.begin(); it != all_objects.end(); ++it)
 		{
-			(*it)->SetLength(half_x, half_y, (std::numeric_limits<T>::max)());
-			(*it)->SetCenter(cen_x, cen_y, (std::numeric_limits<T>::max)());
+			(*it)->SetLength(half_x, half_y);
+			(*it)->SetCenter(cen_x, cen_y);
 		}
 
-		gl_simulation_box->SetPosition(cen_x, cen_y, 0.0f);
-		gl_simulation_box->SetLength(abs(half_x), abs(half_y), 0.0f);
+		gl_simulation_box->SetPosition(cen_x, cen_y);
+		gl_simulation_box->SetLength(abs(half_x), abs(half_y));
 		
 		LoadOpenGLSettings();
 	}
@@ -276,40 +249,11 @@ public: // Member Functions
 		driver->SetDefaultRenderStates3DMode();
 		light_manager->UpdateLightPosition(light_draw_for_debug);
 
-		GRID_STRUCTURE_2D& base_grid = simulation_world->world_discretization.world_grid;
-
-		// Grid Draw
-		if (draw_grid)
-		{
-			float x_min = base_grid.x_min, x_max = base_grid.x_max;
-			float y_min = base_grid.y_min, y_max = base_grid.y_max;
-			float dx = base_grid.dx, dy = base_grid.dy;
-			int i_start = base_grid.i_start, i_end = base_grid.i_end;
-			int j_start = base_grid.j_start, j_end = base_grid.j_end;
-
-			driver->SetDefaultRenderStates2DMode();
-			driver->DrawGrid(x_min, x_max, y_min, y_max, dx, dy, i_start, i_end, j_start, j_end);
-		}
-
-		// Draw for debug
-		if (draw_for_debug)
-		{
-			DYNAMIC_ARRAY<VT>& array_for_debug = simulation_world->numerical_integration.inserted_point;
-			
-			int ij_res = array_for_debug.num_of_elements;
-			
-			for (int i = 0; i < ij_res; i++)
-			{
-				float x_com = array_for_debug[i].x;
-				float y_com = array_for_debug[i].y;
-
-				driver->DrawForDebug(x_com, y_com, i);
-			}
-		}
-
 		// Center axis
 		if (draw_axis)
 		{
+			GRID_STRUCTURE_2D& base_grid = simulation_world->world_discretization.world_grid;
+
 			float half_x = (base_grid.x_max - base_grid.x_min)/2.0f;
 			float half_y = (base_grid.y_max - base_grid.y_min)/2.0f;
 			float cen_x = (base_grid.x_max + base_grid.x_min)/2.0f;
@@ -330,46 +274,8 @@ public: // Member Functions
 		{
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ZERO);
-			if (draw_levelset)
-			{
-				if ((*it)->is_levelset)
-				{
-					(*it)->Draw();
-				}
-			}
+			(*it)->Draw();
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			
-			if (draw_scalar)
-			{
-				if ((*it)->is_scalar)
-				{
-					(*it)->Draw();
-				}
-			}
-
-			if (draw_velocity_x)
-			{
-				if ((*it)->is_velocity_x)
-				{
-					(*it)->Draw();
-				}
-			}
-			
-			if (draw_velocity_y)
-			{
-				if ((*it)->is_velocity_y)
-				{
-					(*it)->Draw();
-				}
-			}
-
-			if (draw_velocity)
-			{
-				if ((*it)->is_velocity)
-				{
-					(*it)->Draw();
-				}
-			}
 		}
 
 		// Menu
@@ -545,17 +451,17 @@ public: // Member Functions
 		case 'b':
 			draw_boundary = !draw_boundary;
 			break;
-		case 't':
+		case 'v':
 			draw_velocity = !draw_velocity;
 			break;
 		case 'o':
-			draw_grid = !draw_grid;
+			draw_velocity_x = !draw_velocity_x;
 			break;
 		case 'j':
-			draw_for_debug = !draw_for_debug;
+			draw_velocity_y = !draw_velocity_y;
 			break;
 		case 'u':
-			draw_scalar = !draw_scalar;
+			draw_pressure = !draw_pressure;
 			break;
 		}
 	}

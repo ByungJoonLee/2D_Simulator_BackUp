@@ -463,47 +463,6 @@ public: // Member Functions
 		glEnd();
 	}
 
-	void DrawGrid(GLfloat x_min, GLfloat x_max, GLfloat y_min, GLfloat y_max, GLfloat dx, GLfloat dy, GLint i_start, GLint i_end, GLint j_start, GLint j_end)
-	{
-		// y-Gridline
-		for (int i = i_start; i <= i_end; i++)
-		{
-			GLfloat x_coor = x_min + i*dx;
-			glBegin(GL_LINES);
-				glColor3f(0.0f, 0.0f, 0.5f);
-				glVertex2f(x_coor, y_min);
-				glVertex2f(x_coor, y_max);
-			glEnd();
-		}
-		// x-Gridline
-		for (int j = j_start; j <= j_end; j++)
-		{
-			GLfloat y_coor = y_min + j*dy;
-			glBegin(GL_LINES);
-				glColor3f(0.0f, 0.0f, 0.5f);
-				glVertex2f(x_min, y_coor);
-				glVertex2f(x_max, y_coor);
-			glEnd();
-		}
-	}
-
-	void DrawForDebug(GLfloat x, GLfloat y, const int i)
-	{
-		glPointSize(5.0f);
-		glBegin(GL_POINTS);
-			glColor3f(0.0f, 1.0f, 0.0f);
-			glVertex2f(x, y);
-		glEnd();
-		glRasterPos2d(-0.05f + x, y);
-		char number[GL_BUFFER_SIZE];
-		sprintf(number, "%d", i);
-	
-		for (int j = 0; j < strlen(number); j++)
-		{
-			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, number[j]);
-		}
-	}
-	
 	void DrawAxis(GLfloat x_center, GLfloat y_center, GLfloat dx, GLfloat dy)
 	{
 		glBegin(GL_LINES);
