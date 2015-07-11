@@ -3,11 +3,13 @@
 #include "OPENGL_SOLVER_BASE.h"
 #include "EULERIAN_FLUID_SOLVER_2D.h"
 #include "OPENGL_LEVELSET.h"
+#include "OPENGL_SCALARFIELD.h"
+#include "OPENGL_VECTORFIELD.h"
 #include <vector>
 
 class EULERIAN_FLUID_SOLVER_2D;
 class OPENGL_LEVELSET;
-
+class OPENGL_SCALARFIELD;
 
 class OPENGL_EULERIAN_FLUID_SOLVER : public OPENGL_SOLVER_BASE
 {
@@ -16,13 +18,25 @@ public: // Essential Data
 	EULERIAN_FLUID_SOLVER_2D*		eulerian_solver;
 
 	OPENGL_LEVELSET*				water_levelset;
+	
+	OPENGL_SCALARFIELD*				pressure_field;
+	OPENGL_VECTORFIELD*				velocity_field;
+	
 
 public: // Constructor and Destructor
 	OPENGL_EULERIAN_FLUID_SOLVER(OPENGL_DRIVER* driver_input, EULERIAN_FLUID_SOLVER_2D* eulerian_object, MULTITHREADING* multithreading_input, float grid_scale)
-		: driver(driver_input), eulerian_solver(eulerian_object), water_levelset(0)
+		: driver(driver_input), eulerian_solver(eulerian_object), water_levelset(0), velocity_field(0), pressure_field(0)
 	{
 		water_levelset = new OPENGL_LEVELSET("EULERIAN_WATER_LEVELSET", driver, eulerian_solver->water_levelset, multithreading_input, grid_scale);
 		AddObject(water_levelset);
+
+		velocity_field = new OPENGL_VECTORFIELD("VELOCITY_FIELD", driver, eulerian_solver->water_velocity_field, eulerian_solver->water_velocity_field_mac_x, eulerian_solver->water_velocity_field_mac_y);
+		AddObject(velocity_field);
+		velocity_field->SetDrawType(OPENGL_VECTORFIELD::VECTORFIELD_DRAW_SHOW);
+		
+		pressure_field = new OPENGL_SCALARFIELD("PRESSURE_FIELD", driver, &eulerian_solver->water_projection->pressure_field);
+		AddObject(pressure_field);
+		pressure_field->SetDrawType(OPENGL_SCALARFIELD::SCALARFIELD_DRAW_SHOW);
 	}
 
 	~OPENGL_EULERIAN_FLUID_SOLVER(void)

@@ -228,25 +228,19 @@ public: // Member Functions
 
 	void SyncSum(const int& thread_id, T& value) 
 	{
+		Sync(thread_id);
+
 		sync_value[thread_id] = value;
 
 		Sync(thread_id);
 
-		if(thread_id == 0)
+		value = sync_value_int[0];			// To remove one assignment
+		for(int i = 1; i < num_threads; i++)
 		{
-			sync_value_temp = sync_value[0];
-			for(int i = 1; i < num_threads; i++)
-			{
-				sync_value_temp += sync_value[i];
-			}
+			sync_value_temp += sync_value[i];
 		}
-		
-		Sync(thread_id);
 				
-		value = sync_value_temp;
-
 		Sync(thread_id);
-		
 	}
 
 	void SyncSum(const int& thread_id, T& value, const int& start_index, const int& end_index)

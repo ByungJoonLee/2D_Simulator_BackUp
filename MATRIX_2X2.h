@@ -50,40 +50,45 @@ public:
 		return MATRIX_2X2(x[3]*s, -x[1]*s, -x[2]*s, x[0]*s);
 	}
 
-   MATRIX_2X2 operator * (const T a) const
-   {
+    MATRIX_2X2 operator * (const T a) const
+    {
 		return MATRIX_2X2(a*x[0],a*x[1],a*x[2],a*x[3]);
-   }
+    }
 
-   static MATRIX_2X2 Identity()
-   {
+    T Determinant(void) const
+	{
+	    return x[0]*x[3] - x[1]*x[2];
+	}
+
+    static MATRIX_2X2 Identity()
+    {
 		return MATRIX_2X2(1, 0, 0, 1);
-   }
+    }
 
-   void operator += (const MATRIX_2X2& A)
-   {
-	   for(int i=0;i<4;i++) x[i] += A.x[i];
-   }
+    void operator += (const MATRIX_2X2& A)
+    {
+	    for(int i=0;i<4;i++) x[i] += A.x[i];
+    }
 
-   void operator *= (const T& a)
-   {
-	   for(int i=0;i<4;i++) x[i] *= a;
-   }
+    void operator *= (const T& a)
+    {
+	    for(int i=0;i<4;i++) x[i] *= a;
+    }
 
-   void operator = (const MATRIX_2X2& A)
-   {
-	   for(int i=0;i<4;i++) x[i] = A.x[i];
-   }
+    void operator = (const MATRIX_2X2& A)
+    {
+	    for(int i=0;i<4;i++) x[i] = A.x[i];
+    }
 
-   MATRIX_2X2 operator + (const MATRIX_2X2& A)
-   {
+    MATRIX_2X2 operator + (const MATRIX_2X2& A)
+    {
 		return MATRIX_2X2(x[0] + A.x[0], x[1] + A.x[1], x[2] + A.x[2], x[3] + A.x[3]);
-   }
+    }
 
-   MATRIX_2X2 operator - (const MATRIX_2X2& A)
-   {
+    MATRIX_2X2 operator - (const MATRIX_2X2& A)
+    {
 		return MATRIX_2X2(x[0] - A.x[0], x[1] - A.x[1], x[2] - A.x[2], x[3] - A.x[3]);
-   }
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& output, const MATRIX_2X2& A)
