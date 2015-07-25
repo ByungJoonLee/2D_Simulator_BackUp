@@ -5,6 +5,7 @@
 #include "MAXIMUM_ENTROPY_ANALYSIS.h"
 #include "WORLD_DISCRETIZATION_2D.h"
 #include "POISSON_EQUATION_TEST.h"
+#include "MONGE_AMPERE_SOLVER.h"
 #include <ctype.h>
 #include <boost/chrono.hpp>
 
@@ -14,6 +15,7 @@ public: // Primitive Solvers which are updated
 	EULERIAN_FLUID_SOLVER_2D		eulerian_solver;
 	NUMERICAL_INTEGRATION			numerical_integration;
     POISSON_EQUATION_TEST			poisson_equation_test;
+	MONGE_AMPERE_SOLVER				monge_ampere_solver;
 	// Temporary
     MAXIMUM_ENTROPY_ANALYSIS        maximum_entropy_analysis;
 
@@ -46,6 +48,7 @@ public: // Options for Simulation
     bool                            BJ_model_test;
     bool                            signal_processing_test;
     bool							poisson_equation_with_jump_condition;
+	bool							monge_ampere_solver_test;
 
 	// Option for Air-Water Simulation
 	bool							large_bubble, small_bubble;
@@ -113,6 +116,7 @@ public: // Initialization Functions
 			numerical_integration_test = script_block_for_this.FindBlock("NUMERICAL_TEST_OPTIONS").GetBoolean("numerical_integration_test", false);
 			poisson_equation_with_jump_condition = script_block_for_this.FindBlock("NUMERICAL_TEST_OPTIONS").GetBoolean("poisson_equation_with_jump_condition", false);
 			signal_processing_test = script_block_for_this.FindBlock("NUMERICAL_TEST_OPTIONS").GetBoolean("signal_processing_test", false);
+			monge_ampere_solver_test = script_block_for_this.FindBlock("NUMERICAL_TEST_OPTIONS").GetBoolean("monge_ampere_solver_test", false);
 
 			if (numerical_integration_test)
 			{
@@ -124,12 +128,6 @@ public: // Initialization Functions
 			} // Test number 1~2 gives 1d example, and the others will be 2d
 		}
 		
-		if (oil_water_simulation)
-		{
-			A_0 = script_block_for_this.GetFloat("A_0", (T)1);
-			alpha = script_block_for_this.GetFloat("alpha", (T)1);
-		}
-
 		// Multithreading
 		multithreading->Initialize(script_block_for_this.GetInteger("number_of_threads"));
 
@@ -158,7 +156,7 @@ public: // Initialization Functions
 				cout << "Vortex Sheet Problem is activated!" << endl;
 			} 
 		}
-		else if (numerical_test_solver)
+		if (numerical_test_solver)
 		{
 			cout << "             <Numerical Test>          " << endl;
 			if (numerical_integration_test)
@@ -175,12 +173,23 @@ public: // Initialization Functions
 				cout << "Poisson Equation with Jump Condition Test is activated!" << endl;
 				cout << "Test Number : #" << test_number << endl;
 			}
+			if (signal_processing_test)
+			{
+				cout << "Signal Processing Test is activated!" << endl;
+			}
+			if (monge_ampere_solver_test)
+			{
+				cout << "Monge-Ampere Solver Test is activated!" << endl;
+			}
 		}
 
-		if (oil_water_simulation)
+		if (fluid_solver)
 		{
-			A_0 = script_block_for_this.GetFloat("A_0", (T)1);
-			alpha = script_block_for_this.GetFloat("alpha", (T)1);
+			if (oil_water_simulation)
+			{
+				A_0 = script_block_for_this.GetFloat("A_0", (T)1);
+				alpha = script_block_for_this.GetFloat("alpha", (T)1);
+			} 
 		}
 
 		cout << "Number of threads: " << multithreading->num_threads << endl;
@@ -188,6 +197,9 @@ public: // Initialization Functions
 		// Initialize world discretization
 		if (fluid_solver)
 		{
+			// Falsify the numerical test options
+			world_discretization.poisson_equation_with_jump_condition_test = false;
+			
 			if (air_water_simulation)
 			{
 				world_discretization.air_water_simulation = true;
@@ -207,10 +219,16 @@ public: // Initialization Functions
 				world_discretization.Initialize(script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("VORTEX_SHEET_PROBLEM"));
 			} 
 		}
-		else if (numerical_test_solver)
+		if (numerical_test_solver)
 		{
+			// Falsify the fluid solver options
+			world_discretization.air_water_simulation = false;
+			world_discretization.oil_water_simulation = false;
+
 			if (numerical_integration_test)
 			{
+				world_discretization.poisson_equation_with_jump_condition_test = false;
+
 				world_discretization.Initialize(script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("NUMERICAL_INTEGRATION_TEST"));
 			} 
 			if (poisson_equation_with_jump_condition)
@@ -219,22 +237,45 @@ public: // Initialization Functions
 				
 				if (test_number == 1 || test_number == 2)
 				{
-					world_discretization.grid_1d = true;	
+					world_discretization.grid_1d = true;
+					world_discretization.grid_2d = false;
 				}
 				else
 				{
+					world_discretization.grid_1d = false;
 					world_discretization.grid_2d = true;	
 				}
 
 				world_discretization.Initialize(script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("POISSON_EQUATION_WITH_JUMP_CONDITION_TEST"));
 			}
+			if (monge_ampere_solver_test)
+			{
+				world_discretization.poisson_equation_with_jump_condition_test = false;
+
+				world_discretization.Initialize(script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("MONGE_AMPERE_TEST"));
+			}
+			if (signal_processing_test)
+			{
+				world_discretization.poisson_equation_with_jump_condition_test = false;
+
+				maximum_entropy_analysis.Nsamps = script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("MAXIMUM_ENTROPY_METHOD_TEST").GetInteger("number_of_samples", (int)1000);
+				maximum_entropy_analysis.min_f = script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("MAXIMUM_ENTROPY_METHOD_TEST").GetFloat("minimum_frequency", (float)2.0)/maximum_entropy_analysis.Nsamps;
+				maximum_entropy_analysis.max_f = script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("MAXIMUM_ENTROPY_METHOD_TEST").GetFloat("maximum_frequency", (float)0.5);
+				maximum_entropy_analysis.ihr = script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("MAXIMUM_ENTROPY_METHOD_TEST").GetInteger("ihr", (int)1);
+				maximum_entropy_analysis.nihr = maximum_entropy_analysis.Nsamps*maximum_entropy_analysis.ihr;
+
+				world_discretization.Initialize(maximum_entropy_analysis.nihr, 0, maximum_entropy_analysis.min_f, maximum_entropy_analysis.max_f);
+			}
 		}
 
 		// Option for Air-Water
-		if (air_water_simulation)
+		if (fluid_solver)
 		{
-			large_bubble = world_discretization.large_bubble;
-			small_bubble = world_discretization.small_bubble;
+			if (air_water_simulation)
+			{
+				large_bubble = world_discretization.large_bubble;
+				small_bubble = world_discretization.small_bubble;
+			} 
 		}
 
 		InitializeNumericalSolversFromScript(script_reader);
@@ -261,6 +302,14 @@ public: // Initialization Functions
 			{
 				poisson_equation_test.world_discretization = &world_discretization;
 			}
+			if (monge_ampere_solver_test)
+			{
+				monge_ampere_solver.world_discretization = &world_discretization;
+			}
+			if (signal_processing_test)
+			{
+				maximum_entropy_analysis.world_discretization = &world_discretization;
+			}
 		}
 		
 		if (fluid_solver)
@@ -283,7 +332,7 @@ public: // Initialization Functions
 				eulerian_solver.InitializeFromScriptBlock(world_discretization.world_grid, script_reader.FindBlock("FLUID_SOLVER_UNIFORM").FindBlock("VORTEX_SHEET_PROBLEM"), multithreading);
 			} 
 		}
-		else if (numerical_test_solver)
+		if (numerical_test_solver)
 		{
 			if (numerical_integration_test)
 			{
@@ -292,6 +341,13 @@ public: // Initialization Functions
 			if (signal_processing_test)
 			{
                 maximum_entropy_analysis.InitializeFromScriptBlock(script_reader.FindBlock("SIGNAL_PROCESSING_TEST"));
+			}
+			if (signal_processing_test)
+			{
+				cout << "bins_per_time_unit : " << maximum_entropy_analysis.bptu << endl;
+				cout << "minimum_filter_length : " << maximum_entropy_analysis.mfl << endl;
+				cout << "number_of_sample : " << maximum_entropy_analysis.Nsamps << endl;
+				cout << "number_of_coefficients : " << maximum_entropy_analysis.Ncoef << endl;
 			}
 			if (poisson_equation_with_jump_condition)
 			{

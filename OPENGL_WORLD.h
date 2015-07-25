@@ -6,6 +6,7 @@
 #include "OPENGL_EULERIAN_FLUID_SOLVER.h"
 #include "OPENGL_LEVELSET.h"
 #include "OPENGL_SCALARFIELD.h"
+#include "OPENGL_1D_GRAPH.h"
 #include "OPENGL_2D_TEXT.h"
 #include <list>
 #include <vector>
@@ -66,6 +67,7 @@ public: // Essential Data
 	OPENGL_LEVELSET*				opengl_levelset_for_numerical_integration;
 	OPENGL_LEVELSET*				opengl_levelset_for_poisson_equation_test;
 	OPENGL_SCALARFIELD*				opengl_solution_for_poisson_equation_test;
+	OPENGL_1D_GRAPH*				opengl_1d_graph_for_signal_processing;
 
 	OPENGL_LIGHT_MANAGER*			light_manager;
 	OPENGL_SIMULATION_BOX*			gl_simulation_box;
@@ -115,6 +117,9 @@ public: // Essential Data
 	string							info_text;
 	string							info_text_def;
 
+	// For 1D drawing
+	bool							test_1d;
+
 public: // Constructor and Destructor
 	OPENGL_WORLD(void)
 		: simulation_world(0)
@@ -145,6 +150,7 @@ public: // Constructor and Destructor
 		, draw_velocity_x(false)
 		, draw_velocity_y(false)
 		, draw_for_debug(false)
+		, test_1d(false)
 		, opengl_fluid_solver(0)
 		, min_num_water_triangles(0)
 		, max_num_water_triangles(0)
@@ -213,6 +219,8 @@ public: // Initialization Function
 			{
 				all_objects.insert(all_objects.end(), (*it)->GetObjects().begin(), (*it)->GetObjects().end());
 			}
+			
+			test_1d = false;
 		}
 		else if (simulation_world->numerical_test_solver)
 		{
@@ -220,6 +228,8 @@ public: // Initialization Function
 			{
 				opengl_levelset_for_numerical_integration = new OPENGL_LEVELSET("NUMERICAL_INTEGRATION_LEVELSET", driver, simulation_world->numerical_integration.object_levelset, multithreading, grid_scale);
 				all_objects.push_back(opengl_levelset_for_numerical_integration);
+				
+				test_1d = false;
 			}
 			if (simulation_world->poisson_equation_with_jump_condition)
 			{
@@ -227,26 +237,65 @@ public: // Initialization Function
 				all_objects.push_back(opengl_levelset_for_poisson_equation_test);
 				opengl_solution_for_poisson_equation_test = new OPENGL_SCALARFIELD("POISSON_SOLUTION_FIELD", driver, &simulation_world->poisson_equation_test.solution_2d);
 				all_objects.push_back(opengl_solution_for_poisson_equation_test);
+				
+				if (simulation_world->world_discretization.grid_1d)
+				{
+					test_1d = true;
+				}
+				if (simulation_world->world_discretization.grid_2d)
+				{
+					test_1d = false;
+				}
+			}
+
+			if (simulation_world->signal_processing_test)
+			{
+				opengl_1d_graph_for_signal_processing = new OPENGL_1D_GRAPH("SIGNAL_GRAPH", driver, &simulation_world->maximum_entropy_analysis.power_spectral_density);
+				all_objects.push_back(opengl_1d_graph_for_signal_processing);
+				
+				test_1d = true;
 			}
 		}		
 		
-		// Simulation grid min/max
-		GRID_STRUCTURE_2D& base_grid = simulation_world->world_discretization.world_grid;
-		
-		float half_x = (base_grid.x_max - base_grid.x_min)/2.0f;
-		float half_y = (base_grid.y_max - base_grid.y_min)/2.0f;
-		float cen_x = (base_grid.x_max + base_grid.x_min)/2.0f;
-		float cen_y = (base_grid.y_max + base_grid.y_min)/2.0f;
-
-		for (vector<OPENGL_OBJECT_BASE*>::iterator it = all_objects.begin(); it != all_objects.end(); ++it)
+		if (test_1d)
 		{
-			(*it)->SetLength(half_x, half_y, (std::numeric_limits<T>::max)());
-			(*it)->SetCenter(cen_x, cen_y, (std::numeric_limits<T>::max)());
-		}
-
-		gl_simulation_box->SetPosition(cen_x, cen_y, 0.0f);
-		gl_simulation_box->SetLength(abs(half_x), abs(half_y), 0.0f);
+			// Simulation grid min/max
+			GRID_STRUCTURE_1D& base_grid = simulation_world->world_discretization.world_grid_1d;
 		
+			float half_x = (base_grid.x_max - base_grid.x_min)/2.0f;
+			float half_y = (base_grid.x_max - base_grid.x_min)/2.0f;
+			float cen_x = (base_grid.x_max + base_grid.x_min)/2.0f;
+			float cen_y = (base_grid.x_max + base_grid.x_min)/2.0f;
+
+			for (vector<OPENGL_OBJECT_BASE*>::iterator it = all_objects.begin(); it != all_objects.end(); ++it)
+			{
+				(*it)->SetLength(half_x, half_y, (std::numeric_limits<T>::max)());
+				(*it)->SetCenter(cen_x, cen_y, (std::numeric_limits<T>::max)());
+			}
+			
+			gl_simulation_box->SetPosition(0.0f, 0.0f, 0.0f);
+			gl_simulation_box->SetLength(abs(half_x), 1.5f, 0.0f);
+		}
+		else
+		{
+			// Simulation grid min/max
+			GRID_STRUCTURE_2D& base_grid = simulation_world->world_discretization.world_grid;
+		
+			float half_x = (base_grid.x_max - base_grid.x_min)/2.0f;
+			float half_y = (base_grid.y_max - base_grid.y_min)/2.0f;
+			float cen_x = (base_grid.x_max + base_grid.x_min)/2.0f;
+			float cen_y = (base_grid.y_max + base_grid.y_min)/2.0f;
+
+			for (vector<OPENGL_OBJECT_BASE*>::iterator it = all_objects.begin(); it != all_objects.end(); ++it)
+			{
+				(*it)->SetLength(half_x, half_y, (std::numeric_limits<T>::max)());
+				(*it)->SetCenter(cen_x, cen_y, (std::numeric_limits<T>::max)());
+			}
+
+			gl_simulation_box->SetPosition(cen_x, cen_y, 0.0f);
+			gl_simulation_box->SetLength(abs(half_x), abs(half_y), 0.0f);
+		}
+			
 		LoadOpenGLSettings();
 	}
 
@@ -275,101 +324,140 @@ public: // Member Functions
 		// Light
 		driver->SetDefaultRenderStates3DMode();
 		light_manager->UpdateLightPosition(light_draw_for_debug);
-
-		GRID_STRUCTURE_2D& base_grid = simulation_world->world_discretization.world_grid;
-
-		// Grid Draw
-		if (draw_grid)
+		
+		if (test_1d)
 		{
-			float x_min = base_grid.x_min, x_max = base_grid.x_max;
-			float y_min = base_grid.y_min, y_max = base_grid.y_max;
-			float dx = base_grid.dx, dy = base_grid.dy;
-			int i_start = base_grid.i_start, i_end = base_grid.i_end;
-			int j_start = base_grid.j_start, j_end = base_grid.j_end;
+			GRID_STRUCTURE_1D& base_grid = simulation_world->world_discretization.world_grid_1d;
 
-			driver->SetDefaultRenderStates2DMode();
-			driver->DrawGrid(x_min, x_max, y_min, y_max, dx, dy, i_start, i_end, j_start, j_end);
-		}
-
-		// Draw for debug
-		if (draw_for_debug)
-		{
-			DYNAMIC_ARRAY<VT>& array_for_debug = simulation_world->numerical_integration.inserted_point;
-			
-			int ij_res = array_for_debug.num_of_elements;
-			
-			for (int i = 0; i < ij_res; i++)
-			{
-				float x_com = array_for_debug[i].x;
-				float y_com = array_for_debug[i].y;
-
-				driver->DrawForDebug(x_com, y_com, i);
-			}
-		}
-
-		// Center axis
-		if (draw_axis)
-		{
 			float half_x = (base_grid.x_max - base_grid.x_min)/2.0f;
-			float half_y = (base_grid.y_max - base_grid.y_min)/2.0f;
-			float cen_x = (base_grid.x_max + base_grid.x_min)/2.0f;
-			float cen_y = (base_grid.y_max + base_grid.y_min)/2.0f;
-
-			driver->SetDefaultRenderStates2DMode();
-			driver->DrawAxis(cen_x, cen_y, half_x, half_y);
-		}
-
-		// ETC
-		if (draw_simulation_box)
-		{
-			gl_simulation_box->Draw();
-		}
-
-		// Main Draw
-		for (vector<OPENGL_OBJECT_BASE*>::iterator it = all_objects.begin(); it != all_objects.end(); ++it)
-		{
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_ONE, GL_ZERO);
-			if (draw_levelset)
-			{
-				if ((*it)->is_levelset)
-				{
-					(*it)->Draw();
-				}
-			}
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			
-			if (draw_scalar)
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+				driver->SetDefaultRenderStatesLineMode();	
+				driver->DrawWireBox1D(half_x, 1.1f);
+			glMatrixMode(GL_MODELVIEW);
+			glPopMatrix();
+						
+			// Main Draw
+			for (vector<OPENGL_OBJECT_BASE*>::iterator it = all_objects.begin(); it != all_objects.end(); ++it)
 			{
-				if ((*it)->is_scalar)
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ZERO);
+				if (draw_levelset)
 				{
-					(*it)->Draw();
+					if ((*it)->is_levelset)
+					{
+						(*it)->Draw();
+					}
+				}
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+				if (draw_scalar)
+				{
+					if ((*it)->is_scalar)
+					{
+						(*it)->Draw();
+					}
+				}
+			} 
+		}
+		else
+		{
+			GRID_STRUCTURE_2D& base_grid = simulation_world->world_discretization.world_grid;
+
+			// Grid Draw
+			if (draw_grid)
+			{
+				float x_min = base_grid.x_min, x_max = base_grid.x_max;
+				float y_min = base_grid.y_min, y_max = base_grid.y_max;
+				float dx = base_grid.dx, dy = base_grid.dy;
+				int i_start = base_grid.i_start, i_end = base_grid.i_end;
+				int j_start = base_grid.j_start, j_end = base_grid.j_end;
+
+				driver->SetDefaultRenderStates2DMode();
+				driver->DrawGrid(x_min, x_max, y_min, y_max, dx, dy, i_start, i_end, j_start, j_end);
+			}
+
+			// Draw for debug
+			if (draw_for_debug)
+			{
+				DYNAMIC_ARRAY<VT>& array_for_debug = simulation_world->numerical_integration.inserted_point;
+
+				int ij_res = array_for_debug.num_of_elements;
+
+				for (int i = 0; i < ij_res; i++)
+				{
+					float x_com = array_for_debug[i].x;
+					float y_com = array_for_debug[i].y;
+
+					driver->DrawForDebug(x_com, y_com, i);
 				}
 			}
 
-			if (draw_velocity_x)
+			// Center axis
+			if (draw_axis)
 			{
-				if ((*it)->is_velocity_x)
-				{
-					(*it)->Draw();
-				}
-			}
-			
-			if (draw_velocity_y)
-			{
-				if ((*it)->is_velocity_y)
-				{
-					(*it)->Draw();
-				}
+				float half_x = (base_grid.x_max - base_grid.x_min)/2.0f;
+				float half_y = (base_grid.y_max - base_grid.y_min)/2.0f;
+				float cen_x = (base_grid.x_max + base_grid.x_min)/2.0f;
+				float cen_y = (base_grid.y_max + base_grid.y_min)/2.0f;
+
+				driver->SetDefaultRenderStates2DMode();
+				driver->DrawAxis(cen_x, cen_y, half_x, half_y);
 			}
 
-			if (draw_velocity)
+			// ETC
+			if (draw_simulation_box)
 			{
-				if ((*it)->is_velocity)
-				{
-					(*it)->Draw();
-				}
+				gl_simulation_box->Draw();
 			}
+
+			// Main Draw
+			for (vector<OPENGL_OBJECT_BASE*>::iterator it = all_objects.begin(); it != all_objects.end(); ++it)
+			{
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ZERO);
+				if (draw_levelset)
+				{
+					if ((*it)->is_levelset)
+					{
+						(*it)->Draw();
+					}
+				}
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+				if (draw_scalar)
+				{
+					if ((*it)->is_scalar)
+					{
+						(*it)->Draw();
+					}
+				}
+
+				if (draw_velocity_x)
+				{
+					if ((*it)->is_velocity_x)
+					{
+						(*it)->Draw();
+					}
+				}
+
+				if (draw_velocity_y)
+				{
+					if ((*it)->is_velocity_y)
+					{
+						(*it)->Draw();
+					}
+				}
+
+				if (draw_velocity)
+				{
+					if ((*it)->is_velocity)
+					{
+						(*it)->Draw();
+					}
+				}
+			} 
 		}
 
 		// Menu
@@ -601,6 +689,9 @@ public: // Member Functions
 	{
 		driver->InitGenericGL();
 		LoadOpenGLSettings(true);
+
+		gl_simulation_box->SetPosition(0, 0, 0);
+		gl_simulation_box->SetLength(0.5f, 0.5f, 0.5f);
 	}
 
 	void InitGL()

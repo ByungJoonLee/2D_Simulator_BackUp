@@ -463,6 +463,16 @@ public: // Member Functions
 		glEnd();
 	}
 
+	void DrawWireBox1D(GLfloat dx, GLfloat dy)
+	{
+		glBegin(GL_LINE_LOOP);
+			glVertex2f(-dx,		-0.5f);
+			glVertex2f(-dx, dy - 0.5f);
+			glVertex2f( dx, dy - 0.5f);
+			glVertex2f( dx,		-0.5f);
+		glEnd();
+	}
+
 	void DrawGrid(GLfloat x_min, GLfloat x_max, GLfloat y_min, GLfloat y_max, GLfloat dx, GLfloat dy, GLint i_start, GLint i_end, GLint j_start, GLint j_end)
 	{
 		// y-Gridline
@@ -483,6 +493,19 @@ public: // Member Functions
 				glColor3f(0.0f, 0.0f, 0.5f);
 				glVertex2f(x_min, y_coor);
 				glVertex2f(x_max, y_coor);
+			glEnd();
+		}
+	}
+
+	void DrawGrid_1D(GLfloat x_min, GLfloat x_max, GLfloat dx, GLint i_start, GLint i_end)
+	{
+		for (int i = i_start; i <= i_end; i++)
+		{
+			GLfloat x_coor = x_min + i*dx;
+			glBegin(GL_LINES);
+				glColor3f(0.0f, 0.0f, 0.5f);
+				glVertex2f(x_coor, x_min);
+				glVertex2f(x_coor, x_max);
 			glEnd();
 		}
 	}
@@ -509,6 +532,30 @@ public: // Member Functions
 		glBegin(GL_LINES);
 			glColor3f(0.0f, 0.0f, 0.0f);
 			glVertex2f(x_center, -1.1*dy);
+			glVertex2f(x_center,  1.1*dy);
+		glEnd();
+
+		glBegin(GL_LINES);
+			glColor3f(0.0f, 0.0f, 0.0f);	
+			glVertex2f(-1.1*dx , y_center);
+			glVertex2f( 1.1*dx , y_center);
+		glEnd();
+
+		glDisable(GL_LIGHTING);
+		glColor3f(0.0f, 0.0f, 0.0f);
+		glRasterPos3f(1.2f + 0.01f, 0.0f, 0.0f);
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'x');
+
+		glColor3f(0.0f, 0.0f, 0.0f);
+		glRasterPos3f(0.0f, 1.5f + 0.07f, 0.0f);
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'y');
+	}
+
+	void DrawAxis1D(GLfloat x_center, GLfloat y_center, GLfloat dx, GLfloat dy)
+	{
+		glBegin(GL_LINES);
+			glColor3f(0.0f, 0.0f, 0.0f);
+			glVertex2f(x_center,  0.0f);
 			glVertex2f(x_center,  1.1*dy);
 		glEnd();
 

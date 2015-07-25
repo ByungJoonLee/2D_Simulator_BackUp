@@ -29,20 +29,22 @@ SIMULATION_WORLD
 	
 	NUMERICAL_TEST_OPTIONS
 	{
-		numerical_integration_test  = false
-		poisson_equation_with_jump_condition = true
-				
+		numerical_integration_test  			= false
+		poisson_equation_with_jump_condition 	= false
+		signal_processing_test					= true
+		monge_ampere_solver_test    			= false
+		
 		NUMERICAL_INTEGRATION_OPTION
 		{
-			BJ_model_test				= false
+			BJ_model_test						= false
 		}
 		
 		POISSON_EQUATION_WITH_JUMP_CONDITION_TEST_NUMBER
 		{
-			test_number					= 8
+			test_number							= 5
 		}
 		
-		signal_processing_test		= false
+		
 	}
 	
 	// A_0 : amplitude, alpha : 2*pi/lambda
@@ -53,8 +55,8 @@ SIMULATION_WORLD
 	{
 		AIR_WATER_SIMULATION
 		{
-			large_bubble = true
-			small_bubble = false
+			large_bubble = false
+			small_bubble = true
 	
 			GRID_STRUCTURE_2D_LARGE
 			{
@@ -153,7 +155,7 @@ SIMULATION_WORLD
 				resolution_scale = 1
 
 				start_indices = (0,0)
-				base_grid_resolution = (121, 121)
+				base_grid_resolution = (241, 241)
 				base_grid_min = ( -1, -1)
 				base_grid_max = (  1,  1)
 			}
@@ -169,11 +171,34 @@ SIMULATION_WORLD
 
 				start_indices = (0,0)
 				base_grid_resolution = (61, 61)
+				base_grid_min = ( -4, -4)
+				base_grid_max = (  4,  4)
+			}
+			
+			padding_width = 2
+		}
+		
+		MONGE_AMPERE_TEST
+		{
+			GRID_STRUCTURE_2D
+			{
+				resolution_scale = 1
+
+				start_indices = (0,0)
+				base_grid_resolution = (61, 61)
 				base_grid_min = ( -3, -3)
 				base_grid_max = (  3,  3)
 			}
 			
 			padding_width = 2
+		}
+		
+		MAXIMUM_ENTROPY_METHOD_TEST
+		{
+			number_of_samples = 1000
+			minimum_frequency = 2
+			maximum_frequency = 0.5
+			ihr				  = 32
 		}
 	}
 }
@@ -207,7 +232,7 @@ SIGNAL_PROCESSING_TEST
 {
 	bins_per_time_unit = 10
 	minimum_filter_length = 30
-	number_of_samples = 100
+	number_of_coefs = 10
 }
 
 FLUID_SOLVER_UNIFORM

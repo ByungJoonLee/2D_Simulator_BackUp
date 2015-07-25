@@ -24,7 +24,7 @@ public: // Essential Data
 	bool					air_water_simulation;
 	bool					oil_water_simulation;
 	bool					poisson_equation_with_jump_condition_test;
-
+	
 	// Options for Poisson Test
 	bool					grid_1d, grid_2d;
 
@@ -38,13 +38,34 @@ public: // Speedup constants
 
 public: // Constructor and Destructor
 	WORLD_DISCRETIZATION_2D(void)
-		: use_grid_uniform(true), air_water_simulation(false), oil_water_simulation(false), poisson_equation_with_jump_condition_test(false), grid_1d(false), grid_2d(false), large_bubble(false), small_bubble(false), is_vertical(false), is_parallel(false)
+		: use_grid_uniform(true), air_water_simulation(false), oil_water_simulation(false), poisson_equation_with_jump_condition_test(false), grid_1d(false), grid_2d(false), large_bubble(false), small_bubble(false), is_vertical(false), is_parallel(false), ghost_width(1)
 	{}
 
 	~WORLD_DISCRETIZATION_2D(void)
 	{}
 
 public: // Initialization Function
+	void Initialize(const int& i_res_input, const int& i_start_input, const T& x_min_input, const T& x_max_input)
+	{
+		world_grid_1d.Initialize(i_res_input, i_start_input, x_min_input, x_max_input);
+		world_grid_1d_ghost.Initialize(world_grid_1d.Enlarged(ghost_width));
+		
+		grid_1d = true;
+		grid_2d = false;
+
+		// Display
+		cout << "---------------DISCRETIZATION VARIABLES---------------" << endl;
+		if (grid_1d)
+		{
+			cout << "Start Indices = " << world_grid_1d.i_start << endl;
+			cout << "Grid Resolution = " << world_grid_1d.i_res << endl;
+			cout << "Domain Range = " << " (" << world_grid_1d.x_min << " ," << world_grid_1d.x_max << ") " << endl;
+		}
+
+		dx = world_grid.dx;
+		dx_over_two = dx*(T)0.5;
+	}
+
 	void Initialize(const SCRIPT_BLOCK& script_block)
 	{
 		ghost_width = script_block.GetInteger("ghost_width", 1);
@@ -58,12 +79,16 @@ public: // Initialization Function
 				world_grid.InitializeFromBlock(script_block.FindBlock("GRID_STRUCTURE_2D_LARGE"));
 				world_grid_ghost.Initialize(world_grid.Enlarged(ghost_width));
 				use_grid_uniform = script_block.GetBoolean("use_grid_uniform", (bool)true);
+				grid_1d = false;
+				grid_2d = true;
 			}
 			if (small_bubble)
 			{
 				world_grid.InitializeFromBlock(script_block.FindBlock("GRID_STRUCTURE_2D_SMALL"));
 				world_grid_ghost.Initialize(world_grid.Enlarged(ghost_width));
 				use_grid_uniform = script_block.GetBoolean("use_grid_uniform", (bool)true);
+				grid_1d = false;
+				grid_2d = true;
 			} 
 		}
 		else if (oil_water_simulation)
@@ -77,6 +102,8 @@ public: // Initialization Function
 				cout << "Vertical Pipe Simulation is activated!" << endl;
 				world_grid_ghost.Initialize(world_grid.Enlarged(ghost_width));
 				use_grid_uniform = script_block.GetBoolean("use_grid_uniform", (bool)true);
+				grid_1d = false;
+				grid_2d = true;
 			}
 			if (is_parallel)
 			{
@@ -84,6 +111,8 @@ public: // Initialization Function
 				cout << "Parallel Pipe Simulation is activated!" << endl;
 				world_grid_ghost.Initialize(world_grid.Enlarged(ghost_width));
 				use_grid_uniform = script_block.GetBoolean("use_grid_uniform", (bool)true);
+				grid_1d = false;
+				grid_2d = true;
 			} 
 		}
 		else if (poisson_equation_with_jump_condition_test)
@@ -94,6 +123,8 @@ public: // Initialization Function
 				cout << "1D simulation is activated!" << endl;
 				world_grid_1d_ghost.Initialize(world_grid_1d.Enlarged(ghost_width));
 				use_grid_uniform = script_block.GetBoolean("use_grid_uniform", (bool)true);
+				grid_1d = true;
+				grid_2d = false;
 			}
 			if (grid_2d)
 			{
@@ -101,6 +132,8 @@ public: // Initialization Function
 				cout << "2D simulation is activated!" << endl;
 				world_grid_ghost.Initialize(world_grid.Enlarged(ghost_width));
 				use_grid_uniform = script_block.GetBoolean("use_grid_uniform", (bool)true);
+				grid_1d = false;
+				grid_2d = true;
 			}
 		}
 		else
@@ -108,14 +141,18 @@ public: // Initialization Function
 			world_grid.InitializeFromBlock(script_block.FindBlock("GRID_STRUCTURE_2D"));
 			world_grid_ghost.Initialize(world_grid.Enlarged(ghost_width));
 			use_grid_uniform = script_block.GetBoolean("use_grid_uniform", (bool)true);
+			grid_1d = false;
+			grid_2d = true;
 		}			
 
 		// Display
 		cout << "---------------DISCRETIZATION VARIABLES---------------" << endl;
+		
 		if (grid_1d)
 		{
 			cout << "Start Indices = " << world_grid_1d.i_start << endl;
 			cout << "Grid Resolution = " << world_grid_1d.i_res << endl;
+			cout << "Domain Range = " << " (" << world_grid_1d.x_min << " ," << world_grid_1d.x_max << ") " << endl;
 		}
 		if (grid_2d)
 		{
@@ -123,7 +160,6 @@ public: // Initialization Function
 			cout << "Grid Resolution = " << " (" << world_grid.i_res << " ," << world_grid.j_res << ") " << endl;
 		}
 		
-
 		InitializeSpeedupConstants();
 	}
 

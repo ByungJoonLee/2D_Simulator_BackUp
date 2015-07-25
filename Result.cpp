@@ -53,6 +53,21 @@ void reset_config()
 	is_captur_image = capture.IsAutoCaptureImage();
 
 	trackball.AutoLoadCamera();
+	
+	if (simulation.simulation->world_discretization.grid_1d)
+	{
+		if (log10f(simulation.simulation->world_discretization.world_grid_1d.x_max) < 0)
+		{
+			if (log10f(simulation.simulation->world_discretization.world_grid_1d.x_max) - (int)log10f(simulation.simulation->world_discretization.world_grid_1d.x_max) == 0)
+			{
+				trackball.angle_of_view = 40 + ((int)log10f(simulation.simulation->world_discretization.world_grid_1d.x_max))*20;
+			}
+			else
+			{
+				trackball.angle_of_view = 40 + ((int)log10f(simulation.simulation->world_discretization.world_grid_1d.x_max) - 1)*20;
+			}
+		}
+	}
 
 	set_2d_display_info();
 
@@ -80,15 +95,29 @@ void display()
 	
 	//For scaling object
 	int dec;
-	if (log10f(simulation.simulation->world_discretization.world_grid.x_max) < 0)
-	{
-		dec = pow(10,-(int)log10f(simulation.simulation->world_discretization.world_grid.x_max));
-		
-	}
-	else
+	if (simulation.simulation->world_discretization.grid_1d)
 	{
 		dec = 1;
 	}
+	else
+	{
+		if (log10f(simulation.simulation->world_discretization.world_grid.x_max) < 0)
+		{
+			if (log10f(simulation.simulation->world_discretization.world_grid.x_max) - (int)log10f(simulation.simulation->world_discretization.world_grid.x_max) == 0)
+			{
+				dec = pow(10,-(int)log10f(simulation.simulation->world_discretization.world_grid.x_max));
+			}
+			else
+			{
+				dec = pow(10,-((int)log10f(simulation.simulation->world_discretization.world_grid.x_max) - 1));
+			}
+		}
+		else
+		{
+			dec = 1;
+		} 
+	}
+	
 	glScalef(dec, dec, 1);
 	
 	simulation.Render();
@@ -296,7 +325,16 @@ int main(int argc, char** argv)
 	}
 
 	capture.Initialize(PROJECT_INFO::GetScriptAbsPath());
-	trackball.Initialize(PROJECT_INFO::GetScriptAbsPath(), simulation.GetSimulationWorld()->world_discretization.world_grid);
+	
+	if (simulation.GetSimulationWorld()->world_discretization.grid_1d)
+	{
+		trackball.Initialize(PROJECT_INFO::GetScriptAbsPath(), simulation.GetSimulationWorld()->world_discretization.world_grid_1d);
+	}
+	else
+	{
+		trackball.Initialize(PROJECT_INFO::GetScriptAbsPath(), simulation.GetSimulationWorld()->world_discretization.world_grid);
+	}
+	
 	reset_config();
 
 	glutMainLoop();

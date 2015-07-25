@@ -47,7 +47,6 @@ public: // Control Option
 	enum POISSON_SOLVER_TYPE    poisson_solver_type;
 
 public: // Option for Boundary Condition
-	
 	bool						Dirichlet_Boundary_Condition, Neumann_Boundary_Condition;
 
 public: // For CG/PCG

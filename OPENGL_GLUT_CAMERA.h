@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nvGlutManipulators.h"
+#include "GRID_STRUCTURE_1D.h"
 #include "GRID_STRUCTURE_2D.h"
 #include <Windows.h>
 #include <GL/glut.h>
@@ -86,6 +87,18 @@ public: // Constructor and Destructor
 	{}
 
 public: // Initialization Function
+	void Initialize(std::string& script_abs_path, GRID_STRUCTURE_1D& grid)
+	{
+		SCRIPT_READER script_reader(script_abs_path.c_str());
+		SCRIPT_BLOCK script_block = script_reader.FindBlock("SIMULATION_WORLD");
+
+		auto_camera_load = script_block.GetBoolean("auto_camera_load", false);
+		camera_num = script_block.GetInteger("camera_num", 0);
+
+		SetCameraNum(camera_num);
+		CalcDollyPosition(grid);
+	}
+
 	void Initialize(std::string& script_abs_path, GRID_STRUCTURE_2D& grid)
 	{
 		SCRIPT_READER script_reader(script_abs_path.c_str());
@@ -408,6 +421,29 @@ public: // Member Functions
 			glLoadIdentity();
 		}
 		gluPerspective(angle_of_view, (double)screen_width/screen_height, z_near, z_far);
+	}
+
+	void CalcDollyPosition(GRID_STRUCTURE_1D& grid)
+	{
+		float diff_x = (grid.x_max - grid.x_min);
+		//float diff_y = (grid.y_max - grid.y_min);
+		//float diff_z = (grid.z_max - grid.z_min);
+		//float diff_max = (std::max)(diff_x, diff_y);
+		//diff_max = (std::max)(diff_max, diff_z);
+		focus_distance = diff_x/tan((angle_of_view)*M_PI_2/180.0);
+
+		float cen_x = (grid.x_max + grid.x_min)/2.0f;
+		//float cen_y = (grid.y_max + grid.y_min)/2.0f;
+		//float cen_z = (grid.z_max + grid.z_min)/2.0f;
+		/*nv::vec3f cv(cen_x, cen_y, cen_z);
+		trackball.setCenterOfRotation(cv);
+
+		trackball._examine._pan.x = -cen_x;
+		trackball._examine._pan.y = -cen_y;
+		trackball._examine._pan.z = -focus_distance;
+
+		scale_pan = focus_distance*SCALE_PAN_FACTOR;
+		scale_zoom = focus_distance*SCALE_ZOOM_FACTOR;*/
 	}
 
 	void CalcDollyPosition(GRID_STRUCTURE_2D& grid)
