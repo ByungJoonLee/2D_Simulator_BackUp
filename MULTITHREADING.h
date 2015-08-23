@@ -234,7 +234,7 @@ public: // Member Functions
 
 		Sync(thread_id);
 
-		value = sync_value_int[0];			// To remove one assignment
+		value = sync_value[0];			// To remove one assignment
 		for(int i = 1; i < num_threads; i++)
 		{
 			sync_value_temp += sync_value[i];

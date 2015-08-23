@@ -67,6 +67,7 @@ public: // Essential Data
 	OPENGL_LEVELSET*				opengl_levelset_for_numerical_integration;
 	OPENGL_LEVELSET*				opengl_levelset_for_poisson_equation_test;
 	OPENGL_SCALARFIELD*				opengl_solution_for_poisson_equation_test;
+	OPENGL_VECTORFIELD*				opengl_monge_ampere_test;
 	OPENGL_1D_GRAPH*				opengl_1d_graph_for_signal_processing;
 
 	OPENGL_LIGHT_MANAGER*			light_manager;
@@ -254,6 +255,16 @@ public: // Initialization Function
 				all_objects.push_back(opengl_1d_graph_for_signal_processing);
 				
 				test_1d = true;
+			}
+
+			if (simulation_world->monge_ampere_solver_test)
+			{
+				opengl_monge_ampere_test = new OPENGL_VECTORFIELD("GRADIENT_MAP", driver, &simulation_world->monge_ampere_solver.grad_u);
+				all_objects.push_back(opengl_monge_ampere_test);
+
+				opengl_monge_ampere_test->SetDrawType(OPENGL_VECTORFIELD::VECTORFIELD_DRAW_MAP);
+
+				test_1d = false;
 			}
 		}		
 		

@@ -8,38 +8,9 @@ class ADVECTION_METHOD_2D
 {
 public: 
 	// Semi-Legrangian Method
-	static void SL1stOrder(FIELD_STRUCTURE_2D<TT>& rho, FIELD_STRUCTURE_2D<TT>& rho_ghost, const FIELD_STRUCTURE_2D<VT>& velocity, const T& dt)
-	{
-		const ARRAY_2D<VT>& velocity_array(velocity.array_for_this);
-		ARRAY_2D<TT>& rho_array(rho.array_for_this);
-
-		rho_ghost.FillGhostCellsFrom(rho_array, true);
-
-		for (int j = rho.grid.j_start - 1; j <= rho.grid.j_end + 1; j++)
-		{
-			for (int i = rho.grid.i_start - 1; i <= rho.grid.i_end + 1; i++)
-			{
-				rho_array(i, j) = rho_ghost.BilinearInterpolation(rho.CellCenter(i, j) - velocity_array(i, j)*dt);
-			}
-		}
-	}
-
-	static void SL1stOrder(LEVELSET_2D& rho, FIELD_STRUCTURE_2D<TT>& rho_ghost, const FIELD_STRUCTURE_2D<VT>& velocity, const T& dt)
-	{
-		const ARRAY_2D<VT>& velocity_array(velocity.array_for_this);
-		ARARY_2D<TT>& rho_array(rho.arr);
-
-		rho_ghost.FillGhostCellsFrom(rho_array, true);
-
-		for (int j = rho.grid.j_start - 1; j <= rho.grid.j_end + 1; j++)
-		{
-			for (int i = rho.grid.i_start - 1; i <= rho.grid.i_end + 1; i++)
-			{
-				rho_array(i, j) = rho_ghost.BilinearInterpolation(rho.CellCenter(i, j) - velocity_array(i, j)*dt);
-			}
-		}
-	}
-
+	static void SL1stOrder(FIELD_STRUCTURE_2D<TT>& rho, FIELD_STRUCTURE_2D<TT>& rho_ghost, const FIELD_STRUCTURE_2D<VT>& velocity, const T& dt);
+	static void SL1stOrder(LEVELSET_2D& rho, FIELD_STRUCTURE_2D<TT>& rho_ghost, const FIELD_STRUCTURE_2D<VT>& velocity, const T& dt);
+	
 	// Gradient Augmented_Method
 	static void Gradient_Augmented_Method(LEVELSET_2D& rho, FIELD_STRUCTURE_2D<TT>& rho_ghost, const FIELD_STRUCTURE_2D<VT>& velocity, const T& dt)
 	{

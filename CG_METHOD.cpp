@@ -1,5 +1,15 @@
 #include "CG_METHOD.h"
 
+void CG_METHOD::Solve(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const FIELD_STRUCTURE_2D<int>& bc)
+{
+	CGMethod(A, x, b);
+}
+
+void CG_METHOD::Solve(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b, const FIELD_STRUCTURE_2D<int>& bc, const int& thread_id)
+{
+	CGMethod(A, x, b, thread_id);
+}
+
 void CG_METHOD::CGMethod(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_ND<T>& b)
 {
 	const int N(x.num_dimension);
@@ -56,9 +66,7 @@ void CG_METHOD::CGMethod(const CSR_MATRIX<T>& A, VECTOR_ND<T>& x, const VECTOR_N
 		}
 
 		res_old = res_new;
-
 		
-
 		num_iteration++;
 	}
 

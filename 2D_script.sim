@@ -31,8 +31,8 @@ SIMULATION_WORLD
 	{
 		numerical_integration_test  			= false
 		poisson_equation_with_jump_condition 	= false
-		signal_processing_test					= true
-		monge_ampere_solver_test    			= false
+		signal_processing_test					= false
+		monge_ampere_solver_test    			= true
 		
 		NUMERICAL_INTEGRATION_OPTION
 		{
@@ -44,7 +44,10 @@ SIMULATION_WORLD
 			test_number							= 5
 		}
 		
-		
+		MONGE_AMPERE_EQUATION_TEST_NUMBER
+		{
+			test_number							= 1
+		}
 	}
 	
 	// A_0 : amplitude, alpha : 2*pi/lambda
@@ -55,8 +58,8 @@ SIMULATION_WORLD
 	{
 		AIR_WATER_SIMULATION
 		{
-			large_bubble = false
-			small_bubble = true
+			large_bubble = true
+			small_bubble = false
 	
 			GRID_STRUCTURE_2D_LARGE
 			{
@@ -178,16 +181,16 @@ SIMULATION_WORLD
 			padding_width = 2
 		}
 		
-		MONGE_AMPERE_TEST
+		MONGE_AMPERE_EQUATION_TEST
 		{
 			GRID_STRUCTURE_2D
 			{
 				resolution_scale = 1
 
 				start_indices = (0,0)
-				base_grid_resolution = (61, 61)
-				base_grid_min = ( -3, -3)
-				base_grid_max = (  3,  3)
+				base_grid_resolution = (65, 65)
+				base_grid_min = ( -0.5, -0.5)
+				base_grid_max = (  0.5,  0.5)
 			}
 			
 			padding_width = 2
@@ -233,6 +236,22 @@ SIGNAL_PROCESSING_TEST
 	bins_per_time_unit = 10
 	minimum_filter_length = 30
 	number_of_coefs = 10
+}
+
+MONGE_AMPERE_EQUATION_TEST
+{
+	tolerance = 0.000001
+	max_iteration_for_sub_linear_solver = 100000
+	max_iteration_for_Newton_Method = 100
+	
+	// Damping parameter
+	alpha = 0.3
+	
+	sub_linear_solver_type = "GS"
+	//MULTIGRID, CG, PCG, HYBRID, GS, BICG
+
+	poisson_solver_type = "PCG"
+	//MULTIGRID, CG, PCG, HYBRID, GS, CUDAPCG, CUDACG
 }
 
 FLUID_SOLVER_UNIFORM
@@ -284,7 +303,7 @@ FLUID_SOLVER_UNIFORM
 		{			
 			tolerance = 0.000001
 			max_iteration = 10000
-
+			
 			air_bubble_rising = true
 			water_drop = false
 			

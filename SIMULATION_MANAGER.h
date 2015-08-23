@@ -216,6 +216,10 @@ public: // Initialization Function
 				{
 					simulation->EstimateSignal();
 				}
+				if (simulation->monge_ampere_solver_test)
+				{
+					simulation->SolveMongeAmpereEquation();
+				}
 			}
 		}
 

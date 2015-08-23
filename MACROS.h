@@ -1,6 +1,6 @@
 #pragma once
 
-enum  POISSON_SOLVER_TYPE                                   {NO_SOLVER, CG, PCG};
+enum  POISSON_SOLVER_TYPE                                   {NO_SOLVER, CG, PCG, GS, BICG};
 
 #define PI													(T)3.141592
 #define BC_FULL												0
@@ -8,6 +8,7 @@ enum  POISSON_SOLVER_TYPE                                   {NO_SOLVER, CG, PCG}
 #define BC_OBJ												-2
 #define BC_NULL												-3
 #define BC_NEUM												-4
+#define BC_IMPLICIT											-5
 
 #define CLAMP(v, min, max)									((v) < (min) ? (min) : ((v) > (max) ? (max) : (v)))
 

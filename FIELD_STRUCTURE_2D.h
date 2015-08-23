@@ -326,7 +326,7 @@ public: // Member Functions
 			array_for_this[i] += value;
 		}
 	}
-
+	
 public: // Speedup Functions
 	inline const TT ArrayValue(const int& i, const int& j) const
 	{

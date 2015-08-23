@@ -230,18 +230,6 @@ public: // Solver
 			
 			poisson_solver.Solve(solution_2d,beta_2d, boundary_condition_2d, rhs_2d, *interface_levelset_2d, jc_on_solution_2d, jc_on_derivative_2d);
 			//poisson_solver.Solve(solution_2d, beta_2d, boundary_condition_2d, rhs_2d, beta_2d, *interface_levelset_2d, jc_on_solution_2d, jc_on_derivative_2d, thread_id);
-			
-			ofstream fout;
-			fout.open("sol_test");
-			for (int j = solution_2d.j_start; j <= solution_2d.j_end; j++)
-			{
-				for (int i = solution_2d.i_start; i <= solution_2d.i_end; i++)
-					fout << solution_2d(i, j) << " ";
-
-					fout << "\n";
-				}
-			fout.close();
-
 		}
 	}
 

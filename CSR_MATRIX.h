@@ -167,7 +167,7 @@ public: // Operator Overloading
 		int vix;
 		vix = row_ptr[row_input];
 
-		/*while (true)
+		for (int vix = row_ptr[row_input]; vix < row_ptr[row_input + 1]; vix++)
 		{
 			if (column_index[vix] == column_input)
 			{
@@ -176,16 +176,7 @@ public: // Operator Overloading
 			}
 			else
 			{
-				vix += 1;
-			}
-		}*/
 
-		for (int vix = row_ptr[row_input]; vix < row_ptr[row_input + 1]; vix++)
-		{
-			if (column_index[vix] == column_input)
-			{
-				return values[vix];
-				is_nonzero = true;
 			}
 		}
 

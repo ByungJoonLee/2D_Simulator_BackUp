@@ -93,8 +93,8 @@ void display()
 	
 	trackball.GlutDisplay();
 	
-	//For scaling object
-	int dec;
+	//For scaling object - Assuming that the given simulation is performed on symmetric regional domain
+	T dec;
 	if (simulation.simulation->world_discretization.grid_1d)
 	{
 		dec = 1;
@@ -106,15 +106,18 @@ void display()
 			if (log10f(simulation.simulation->world_discretization.world_grid.x_max) - (int)log10f(simulation.simulation->world_discretization.world_grid.x_max) == 0)
 			{
 				dec = pow(10,-(int)log10f(simulation.simulation->world_discretization.world_grid.x_max));
+				dec = dec/abs(dec*simulation.simulation->world_discretization.world_grid.x_max);
 			}
 			else
 			{
 				dec = pow(10,-((int)log10f(simulation.simulation->world_discretization.world_grid.x_max) - 1));
+				dec = dec/abs(dec*simulation.simulation->world_discretization.world_grid.x_max);
 			}
 		}
 		else
 		{
 			dec = 1;
+			dec = dec/abs(dec*simulation.simulation->world_discretization.world_grid.x_max);
 		} 
 	}
 	

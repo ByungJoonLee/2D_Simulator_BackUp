@@ -2,7 +2,7 @@
 
 #include "OPENGL_OBJECT_BASE.h"
 
-class OPENGL_VECTORFIELD : public OPENGL_OBJECT_BASE
+class OPENGL_VECTORMAP : public OPENGL_OBJECT_BASE
 {
 public: // Enumerates
 	enum FIELD
@@ -19,7 +19,6 @@ public: // Enumerates
 		VECTORFIELD_DRAW_SHOW  ,
 		VECTORFIELD_DRAW_SHOW_X,
 		VECTORFIELD_DRAW_SHOW_Y,
-		VECTORFIELD_DRAW_MAP
 	};
 
 public: // Essential Data
@@ -51,8 +50,6 @@ public: // Constructor and Destructor
 		RegisterDrawType((int) VECTORFIELD_DRAW_SHOW  , "DRAW (-,+,/,*)");
 		RegisterDrawType((int) VECTORFIELD_DRAW_SHOW_X, "DRAW_X (-,+,/,*)");
 		RegisterDrawType((int) VECTORFIELD_DRAW_SHOW_Y, "DRAW_Y (-,+,/,*)");
-		RegisterDrawType((int) VECTORFIELD_DRAW_MAP, "DRAW_MAP (-,+,/,*)");
-		
 		SetDrawType((int) VECTORFIELD_HIDE);
 
 		for (int i = 0; i < FIELD_NUM; i++)
@@ -325,28 +322,6 @@ public: // Initialization Function
 		}
 	}
 
-	void RenderMap(bool draw_with_name = false)
-	{
-		int i, j;
-		int count_cell = 0;
-		int name_cell = -1;
-
-		LOOPS_2D(i, j, min[FIELD_X], min[FIELD_Y], max[FIELD_X], max[FIELD_Y])
-		{
-			VT& vec = VT(vector_field->array_for_this(i, j).x, vector_field->array_for_this(i, j).y);
-			
-			name_cell = name_base + count_cell;
-
-			
-			glBegin(GL_POINTS);
-				//glVertex3f(ces.x, ces.y, 1.0f);
-				glVertex3f(vec.x, vec.y, 0.0f);
-			glEnd();
-
-			count_cell++;
-		}
-	}
-
 	void IncrementValue()
 	{
 		if (GetDrawType() == VECTORFIELD_HIDE)
@@ -475,8 +450,6 @@ public: // Virtual Functions
 		case VECTORFIELD_DRAW_SHOW_Y:
 			RenderYField();
 			break;
-		case VECTORFIELD_DRAW_MAP:
-			RenderMap();
 		}
 	}
 

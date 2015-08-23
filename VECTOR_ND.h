@@ -235,6 +235,20 @@ public: // Member Functions
 
 		return max_abs;
 	}
+
+	T Norm2(void) const
+	{
+		T norm_2(0);
+
+		for (int i = 0; i < num_dimension; i++)
+		{
+			norm_2 += POW2(values[i]);
+		}
+
+		norm_2 = sqrt(norm_2);
+
+		return norm_2;
+	}
 };
 
 inline static T DotProduct(const VECTOR_ND<T>& v1, const VECTOR_ND<T>& v2)

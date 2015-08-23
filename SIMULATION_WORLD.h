@@ -126,6 +126,10 @@ public: // Initialization Functions
 			{
 				test_number = script_block_for_this.FindBlock("NUMERICAL_TEST_OPTIONS").FindBlock("POISSON_EQUATION_WITH_JUMP_CONDITION_TEST_NUMBER").GetInteger("test_number", (int)1);
 			} // Test number 1~2 gives 1d example, and the others will be 2d
+			if (monge_ampere_solver_test)
+			{
+				test_number = script_block_for_this.FindBlock("NUMERICAL_TEST_OPTIONS").FindBlock("MONGE_AMPERE_EQUATION_TEST_NUMBER").GetInteger("test_number", (int)1);
+			}
 		}
 		
 		// Multithreading
@@ -180,6 +184,7 @@ public: // Initialization Functions
 			if (monge_ampere_solver_test)
 			{
 				cout << "Monge-Ampere Solver Test is activated!" << endl;
+				cout << "Test Number : #" << test_number << endl;
 			}
 		}
 
@@ -252,7 +257,7 @@ public: // Initialization Functions
 			{
 				world_discretization.poisson_equation_with_jump_condition_test = false;
 
-				world_discretization.Initialize(script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("MONGE_AMPERE_TEST"));
+				world_discretization.Initialize(script_block_for_this.FindBlock("WORLD_DISCRETIZATION").FindBlock("MONGE_AMPERE_EQUATION_TEST"));
 			}
 			if (signal_processing_test)
 			{
@@ -355,6 +360,11 @@ public: // Initialization Functions
 				poisson_equation_test.grid_1d = world_discretization.grid_1d;
 				poisson_equation_test.grid_2d = world_discretization.grid_2d;
 				poisson_equation_test.InitializeFromBlock(script_reader.FindBlock("POISSON_EQUATION_TEST"), multithreading);
+			}
+			if (monge_ampere_solver_test)
+			{
+				monge_ampere_solver.test_number = test_number;
+				monge_ampere_solver.InitializeFromBlock(script_reader.FindBlock("MONGE_AMPERE_EQUATION_TEST"), multithreading);
 			}
 		}
 	}
@@ -680,7 +690,13 @@ public: // Initialization Functions
 	{
 		multithreading->RunThreads(&SIMULATION_WORLD::DeterminePoissonSolutionThreaded, this);
 	}
-		
+	
+	// For Monge Ampere Equation
+	void SolveMongeAmpereEquation()
+	{
+		multithreading->RunThreads(&SIMULATION_WORLD::SolveMongeAmpereEquationThreaded, this);
+	}
+
 	void DeterminePoissonSolutionThreaded(const int& thread_id)
 	{
 		poisson_equation_test.Solve(thread_id);
@@ -703,6 +719,11 @@ public: // Initialization Functions
 		}
 	}
 
+	void SolveMongeAmpereEquationThreaded(const int& thread_id)
+	{
+		monge_ampere_solver.SolveThreaded(thread_id);
+	}
+	
 	T DetermineTimeStep()
 	{
 		//T dt_for_this = (T)1/frame_rate;
